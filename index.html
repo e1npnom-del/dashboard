@@ -358,9 +358,6 @@
 </div>
 
 <script>
-<script>
-
-
 
 
 // ── โหลด CSV จาก GitHub โดยตรง ─────────────────────────────────
@@ -423,22 +420,41 @@ document.body.insertAdjacentHTML('beforeend',`
     <div style="color:#8b90a8;font-size:12px">event_outage_data.csv</div>
   </div>`);
 
-fetch('./event_outage_data.csv')
-  .then(r => {
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.text();
-  })
-  .then(text => {
-    const records = parseCSV(text);
-    records.forEach(r => DATA.push(r));
-    document.getElementById('loading').remove();
-    init();
-  })
-  .catch(err => {
+// ลอง path ต่าง ๆ เผื่อ GitHub Pages อยู่ใน subdirectory
+const base = location.pathname.replace(/\/[^/]*$/, '/');
+const csvPaths = [
+  base + 'event_outage_data.csv',
+  './event_outage_data.csv',
+  '/event_outage_data.csv'
+];
+
+function tryFetch(paths) {
+  if(!paths.length) {
     document.getElementById('loading').innerHTML =
-      `<div style="color:#ef5350;font-size:14px">❌ โหลดข้อมูลไม่สำเร็จ: ${err.message}</div>
-       <div style="color:#8b90a8;font-size:12px;margin-top:8px">ตรวจสอบว่า event_outage_data.csv อยู่ใน repo เดียวกัน</div>`;
-  });
+      `<div style="color:#ef5350;font-size:15px;font-weight:600">❌ ไม่พบไฟล์ event_outage_data.csv</div>
+       <div style="color:#8b90a8;font-size:12px;margin-top:8px">ตรวจสอบว่าอัพโหลด event_outage_data.csv เข้า GitHub repo แล้ว</div>
+       <div style="color:#8b90a8;font-size:11px;margin-top:4px">URL: ${location.href}</div>`;
+    return;
+  }
+  const path = paths[0];
+  fetch(path)
+    .then(r => {
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(text => {
+      // ตรวจสอบว่าได้ CSV จริง ไม่ใช่ HTML error page
+      if(text.trim().startsWith('<')) throw new Error('ได้รับ HTML แทน CSV');
+      const records = parseCSV(text);
+      if(!records.length) throw new Error('CSV ว่างเปล่า');
+      records.forEach(r => DATA.push(r));
+      document.getElementById('loading').remove();
+      init();
+    })
+    .catch(() => tryFetch(paths.slice(1)));
+}
+
+tryFetch(csvPaths);
 
 function init() {
 // ────────────────────────────────────────────────────────────────
