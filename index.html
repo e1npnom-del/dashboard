@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แดชบอร์ดไฟฟ้าขัดข้อง — กฟจ.นครพนม</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #20232e;
+    --border: #2c3044;
+    --accent: #f5a623;
+    --accent2: #4fc3f7;
+    --accent3: #81c784;
+    --accent4: #ef5350;
+    --text: #e8eaf0;
+    --muted: #8b90a8;
+    --gfj: #f5a623;
+    --gfs: #4fc3f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sarabun', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header h1 { font-size: 17px; font-weight: 600; color: var(--text); }
+  .header p { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  /* FILTER BAR */
+  .filter-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-group label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .filter-group select, .filter-group input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 10px;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 160px;
+  }
+  .filter-group input[type="date"] { min-width: 130px; }
+  .filter-group select:focus, .filter-group input:focus { outline: none; border-color: var(--accent); }
+
+  /* pill buttons - kept for potential use */
+  .pill-group { display: flex; gap: 6px; }
+  .pill {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    padding: 5px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Sarabun', sans-serif;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .pill:hover { border-color: var(--accent); color: var(--accent); }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+
+  .reset-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 12px;
+    margin-left: auto;
+    transition: all .15s;
+  }
+  .reset-btn:hover { border-color: var(--accent4); color: var(--accent4); }
+
+  /* MAIN */
+  .main { padding: 20px 24px; }
+
+  /* KPI ROW */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .kpi.k1::before { background: var(--accent); }
+  .kpi.k2::before { background: var(--accent2); }
+  .kpi.k3::before { background: var(--accent4); }
+  .kpi.k4::before { background: var(--accent3); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .kpi-val { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* GRID 2-COL */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* CARDS */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  /* BAR CHART */
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; }
+  .bar-label { width: 180px; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; text-align: right; }
+  .bar-track { flex: 1; background: rgba(255,255,255,0.05); border-radius: 3px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+  .bar-count { width: 32px; font-size: 11px; color: var(--muted); text-align: right; flex-shrink: 0; }
+
+  /* DONUT */
+  canvas { display: block; }
+
+  /* TIMELINE / scatter */
+  .timeline-wrap { position: relative; height: 200px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    position: sticky; top: 0;
+    background: #252836;
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background .1s; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-gfj { background: rgba(245,166,35,0.15); color: var(--gfj); }
+  .badge-gfs { background: rgba(79,195,247,0.15); color: var(--gfs); }
+
+  .count-result {
+    font-size: 11px; color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+    .bar-label { width: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">⚡</div>
+  <div>
+    <h1>แดชบอร์ดไฟฟ้าขัดข้อง</h1>
+    <p>การไฟฟ้าส่วนภูมิภาคจังหวัดนครพนม — ข้อมูล ก.พ. – พ.ย. 2568</p>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <!-- Location dropdown -->
+  <div class="filter-group">
+    <label>การไฟฟ้าสาขา</label>
+    <select id="locationSel" onchange="applyFilters()">
+      <option value="all">ทั้งหมด</option>
+      <option value="กฟจ.นครพนม (L)">กฟจ.นครพนม</option>
+      <option value="กฟส.ท่าอุเทน (XS)">กฟส.ท่าอุเทน</option>
+    </select>
+  </div>
+
+  <!-- Date from -->
+  <div class="filter-group">
+    <label>วันที่เริ่มต้น</label>
+    <input type="date" id="dateFrom" onchange="applyFilters()">
+  </div>
+
+  <!-- Date to -->
+  <div class="filter-group">
+    <label>วันที่สิ้นสุด</label>
+    <input type="date" id="dateTo" onchange="applyFilters()">
+  </div>
+
+  <!-- Equipment code (has letters) -->
+  <div class="filter-group">
+    <label>รหัสอุปกรณ์</label>
+    <select id="equipSel" onchange="applyFilters()">
+      <option value="">ทั้งหมด</option>
+    </select>
+  </div>
+
+  <!-- Transformer number (digits only) -->
+  <div class="filter-group">
+    <label>หมายเลขหม้อแปลง</label>
+    <select id="transSel" onchange="applyFilters()">
+      <option value="">ทั้งหมด</option>
+    </select>
+  </div>
+
+  <button class="reset-btn" onclick="resetFilters()">↺ รีเซ็ต</button>
+</div>
+
+<div class="main">
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi k1">
+      <div class="kpi-label">เหตุการณ์ทั้งหมด</div>
+      <div class="kpi-val" id="kpiTotal">—</div>
+      <div class="kpi-sub">รายการที่กรอง</div>
+    </div>
+    <div class="kpi k2">
+      <div class="kpi-label">เฉลี่ยระยะเวลาดับ</div>
+      <div class="kpi-val" id="kpiAvgOut">—</div>
+      <div class="kpi-sub">นาที/ครั้ง</div>
+    </div>
+    <div class="kpi k3">
+      <div class="kpi-label">ผู้ใช้กระทบรวม</div>
+      <div class="kpi-val" id="kpiUsers">—</div>
+      <div class="kpi-sub">ราย</div>
+    </div>
+    <div class="kpi k4">
+      <div class="kpi-label">เฉลี่ยเวลาแก้ไข</div>
+      <div class="kpi-val" id="kpiAvgFix">—</div>
+      <div class="kpi-sub">นาที/ครั้ง</div>
+    </div>
+  </div>
+
+  <!-- Row 1: cause + location donut + monthly bar -->
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent4)"></span>สาเหตุที่พบบ่อย</div>
+      <div class="bar-chart" id="causeBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>สัดส่วนตามสาขา</div>
+      <canvas id="donutChart" width="220" height="220" style="margin:0 auto;display:block"></canvas>
+      <div id="donutLegend" style="display:flex;gap:12px;justify-content:center;margin-top:10px;font-size:11px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>จำนวนเหตุการณ์รายเดือน</div>
+      <canvas id="monthBar" width="300" height="200" style="width:100%;height:auto"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 2: equipment hotspot + transformer + weather -->
+  <div class="grid3">
+
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent)"></span>รหัสอุปกรณ์ที่เกิดเหตุบ่อย (Top 10)</div>
+      <div class="bar-chart" id="equipBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--accent)"></span>หมายเลขหม้อแปลงที่เกิดเหตุบ่อย (Top 10)</div>
+      <div class="bar-chart" id="transBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--muted)"></span>สภาพอากาศขณะเกิดเหตุ</div>
+      <div class="bar-chart" id="weatherBars"></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>รายละเอียดเหตุการณ์</div>
+    <div class="count-result" id="tableCount"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>วันที่</th>
+            <th>เวลา</th>
+            <th>ดับ (นาที)</th>
+            <th>สาขา</th>
+            <th>รหัสอุปกรณ์</th>
+            <th>ผู้กระทบ</th>
+            <th>สาเหตุ</th>
+            <th>สภาพอากาศ</th>
+            <th>แก้ไข (นาที)</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+<script>
+
+
+
+
+// ── โหลด CSV จาก GitHub โดยตรง ─────────────────────────────────
+const THAI_MONTHS = {'ม.ค.':'01','ก.พ.':'02','มี.ค.':'03','เม.ย.':'04','พ.ค.':'05','มิ.ย.':'06','ก.ค.':'07','ส.ค.':'08','ก.ย.':'09','ต.ค.':'10','พ.ย.':'11','ธ.ค.':'12'};
+
+function parseDate(s){
+  s=s.trim();
+  Object.entries(THAI_MONTHS).forEach(([t,n])=>{s=s.replace(t,n);});
+  const p=s.split(' ');
+  if(p.length===3){try{return `${+p[2]-543}-${p[1]}-${p[0].padStart(2,'0')}`;}catch(e){}}
+  return s;
+}
+
+function parseCSV(text){
+  const lines=text.replace(/\r/g,'').split('\n').filter(Boolean);
+  const header=lines[0].replace(/^\uFEFF/,'').split(',').map(h=>h.trim());
+  const toInt=(v,d=0)=>{const n=parseFloat(v);return isNaN(n)?d:Math.round(n);};
+  return lines.slice(1).map(line=>{
+    const cols=[];let cur='',inQ=false;
+    for(const ch of line+','){
+      if(ch==='"'){inQ=!inQ;continue;}
+      if(ch===','&&!inQ){cols.push(cur.trim());cur='';continue;}
+      cur+=ch;
+    }
+    const r={};header.forEach((h,i)=>r[h]=(cols[i]||'').trim());
+    return {
+      'ลำดับ':toInt(r['ลำดับ']),
+      'วันที่':r['วันที่']||'',
+      'เวลาเริ่ม':r['เวลาเริ่ม']||'',
+      'เวลาสิ้นสุด':r['เวลาสิ้นสุด']||'',
+      'ระยะเวลาดับ_นาที':toInt(r['ระยะเวลาดับ_นาที']),
+      'สถานที่':r['สถานที่']||'',
+      'รหัสอุปกรณ์':r['รหัสอุปกรณ์']||'',
+      'จำนวนผชฟ_กระทบ':toInt(r['จำนวนผชฟ_กระทบ']),
+      'สภาพอากาศ':r['สภาพอากาศ']||'',
+      'สาเหตุ':r['สาเหตุ']||'',
+      'ช่องทางการแจ้ง':r['ช่องทางการแจ้ง']||'',
+      'เวลารับแจ้ง':r['เวลารับแจ้ง']||'',
+      'เวลาออกปฏิบัติงาน':r['เวลาออกปฏิบัติงาน']||'',
+      'เวลาเสร็จงาน':r['เวลาเสร็จงาน']||'',
+      'เวลาแก้ไข_นาที':toInt(r['เวลาแก้ไข_นาที']),
+      'ผู้ปฏิบัติงาน':r['ผู้ปฏิบัติงาน']||'',
+      'ยานพาหนะ':r['ยานพาหนะ']||'',
+      'อุปกรณ์_รายการ':r['อุปกรณ์_รายการ']||'',
+      'อุปกรณ์_จำนวน':r['อุปกรณ์_จำนวน']||'',
+      'หมายเหตุ':r['หมายเหตุ']||'',
+      'date_iso':parseDate(r['วันที่']||''),
+    };
+  });
+}
+
+const DATA = [];
+let filtered = [];
+
+// Loading overlay
+document.body.insertAdjacentHTML('beforeend',`
+  <div id="loading" style="position:fixed;inset:0;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px">
+    <div style="font-size:32px">⚡</div>
+    <div style="color:#e8eaf0;font-size:15px;font-weight:600">กำลังโหลดข้อมูล...</div>
+    <div style="color:#8b90a8;font-size:12px">event_outage_data.csv</div>
+  </div>`);
+
+fetch('event_outage_data.csv?_=' + Date.now())
+  .then(r => {
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
+  })
+  .then(text => {
+    const records = parseCSV(text);
+    records.forEach(r => DATA.push(r));
+    document.getElementById('loading').remove();
+    init();
+  })
+  .catch(err => {
+    document.getElementById('loading').innerHTML =
+      `<div style="color:#ef5350;font-size:14px">❌ โหลดข้อมูลไม่สำเร็จ: ${err.message}</div>
+       <div style="color:#8b90a8;font-size:12px;margin-top:8px">ตรวจสอบว่า event_outage_data.csv อยู่ใน repo เดียวกัน</div>`;
+  });
+
+function init() {
+// ────────────────────────────────────────────────────────────────
+filtered = [...DATA];
+
+// Classify: has any English letter → equipment code, else → transformer number
+function isEquipCode(code) { return /[A-Za-z]/.test(code); }
+
+// Init date range
+const dates = DATA.map(d=>d.date_iso).filter(Boolean).sort();
+document.getElementById('dateFrom').value = dates[0];
+document.getElementById('dateTo').value = dates[dates.length-1];
+
+// Build equipment & transformer dropdowns
+function buildSelects() {
+  const eFreq = {}, tFreq = {};
+  DATA.forEach(r => {
+    const code = (r['รหัสอุปกรณ์']||'').trim();
+    if(!code) return;
+    if(isEquipCode(code)) eFreq[code] = (eFreq[code]||0)+1;
+    else tFreq[code] = (tFreq[code]||0)+1;
+  });
+  const fill = (selId, freq) => {
+    const sel = document.getElementById(selId);
+    Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,40).forEach(([code,cnt])=>{
+      const o = document.createElement('option');
+      o.value = code;
+      o.textContent = `${code} (${cnt})`;
+      sel.appendChild(o);
+    });
+  };
+  fill('equipSel', eFreq);
+  fill('transSel', tFreq);
+}
+buildSelects();
+
+function resetFilters() {
+  document.getElementById('locationSel').value = 'all';
+  document.getElementById('dateFrom').value = dates[0];
+  document.getElementById('dateTo').value = dates[dates.length-1];
+  document.getElementById('equipSel').value = '';
+  document.getElementById('transSel').value = '';
+  applyFilters();
+}
+
+function applyFilters() {
+  const loc  = document.getElementById('locationSel').value;
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  const eq   = document.getElementById('equipSel').value;
+  const tr   = document.getElementById('transSel').value;
+
+  filtered = DATA.filter(r => {
+    if(loc !== 'all' && r['สถานที่'] !== loc) return false;
+    if(from && r.date_iso < from) return false;
+    if(to   && r.date_iso > to)   return false;
+    if(eq && r['รหัสอุปกรณ์'] !== eq) return false;
+    if(tr && r['รหัสอุปกรณ์'] !== tr) return false;
+    return true;
+  });
+
+  render();
+}
+
+function fmt(n) {
+  if(n === null || n === undefined || isNaN(n)) return '—';
+  return n.toLocaleString('th-TH');
+}
+
+function topN(arr, key, n=10) {
+  const freq = {};
+  arr.forEach(r => {
+    const k = r[key] || '(ไม่ระบุ)';
+    freq[k] = (freq[k]||0)+1;
+  });
+  return Object.entries(freq).filter(([k])=>k&&k!=='(ไม่ระบุ)').sort((a,b)=>b[1]-a[1]).slice(0,n);
+}
+
+function renderBars(containerId, data, color='var(--accent)') {
+  const el = document.getElementById(containerId);
+  if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px">ไม่มีข้อมูล</div>'; return; }
+  const max = data[0][1];
+  el.innerHTML = data.map(([label, cnt]) => `
+    <div class="bar-row">
+      <div class="bar-label" title="${label}">${label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${(cnt/max*100).toFixed(1)}%;background:${color}"></div>
+      </div>
+      <div class="bar-count">${cnt}</div>
+    </div>`).join('');
+}
+
+function drawDonut(ctx, data) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2, r=Math.min(W,H)/2-16, ri=r*0.58;
+  const total = data.reduce((s,d)=>s+d.v,0);
+  let angle = -Math.PI/2;
+  data.forEach(d => {
+    const sweep = (d.v/total)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,angle,angle+sweep);
+    ctx.closePath();
+    ctx.fillStyle = d.c;
+    ctx.fill();
+    angle += sweep;
+  });
+  // hole
+  ctx.beginPath();
+  ctx.arc(cx,cy,ri,0,Math.PI*2);
+  ctx.fillStyle = 'var(--card)';
+  ctx.fill();
+  // center text
+  ctx.fillStyle = '#e8eaf0';
+  ctx.font = 'bold 18px Sarabun, sans-serif';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText(total, cx, cy-8);
+  ctx.font = '11px Sarabun, sans-serif';
+  ctx.fillStyle = '#8b90a8';
+  ctx.fillText('ครั้ง', cx, cy+12);
+}
+
+function drawMonthBar(ctx, data) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0,0,W,H);
+  if(!data.length) return;
+  const pad = {t:10,r:10,b:30,l:30};
+  const cw = W-pad.l-pad.r, ch = H-pad.t-pad.b;
+  const max = Math.max(...data.map(d=>d.v));
+  const bw = cw/data.length - 4;
+
+  data.forEach((d,i) => {
+    const x = pad.l + i*(cw/data.length) + 2;
+    const bh = max ? (d.v/max)*ch : 0;
+    const y = pad.t + ch - bh;
+    // bar
+    const isGfj = d.label.includes('L') || !d.label;
+    ctx.fillStyle = d.loc === 'mix' ? 'var(--accent)' : (d.loc==='gfj'?'#f5a623':'#4fc3f7');
+    ctx.fillStyle = 'var(--accent)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, bw, bh, [3,3,0,0]);
+    ctx.fill();
+    // label
+    ctx.fillStyle = '#8b90a8';
+    ctx.font = '9px Sarabun, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(d.label, x+bw/2, pad.t+ch+14);
+    // value
+    if(d.v>0) {
+      ctx.fillStyle = '#e8eaf0';
+      ctx.font = '9px Sarabun, sans-serif';
+      ctx.fillText(d.v, x+bw/2, y-4);
+    }
+  });
+}
+
+const MONTHS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function render() {
+  const f = filtered;
+
+  // KPIs
+  document.getElementById('kpiTotal').textContent = f.length;
+  const avgOut = f.length ? Math.round(f.reduce((s,r)=>s+Math.max(0,+r['ระยะเวลาดับ_นาที']||0),0)/f.length) : 0;
+  document.getElementById('kpiAvgOut').textContent = avgOut;
+  document.getElementById('kpiUsers').textContent = fmt(f.reduce((s,r)=>s+(+r['จำนวนผชฟ_กระทบ']||0),0));
+  const avgFix = f.length ? Math.round(f.reduce((s,r)=>s+Math.max(0,+r['เวลาแก้ไข_นาที']||0),0)/f.length) : 0;
+  document.getElementById('kpiAvgFix').textContent = avgFix;
+
+  // Cause bars
+  const causes = topN(f,'สาเหตุ',8);
+  renderBars('causeBars', causes, 'var(--accent4)');
+
+  // Donut
+  const gfj = f.filter(r=>r['สถานที่']==='กฟจ.นครพนม (L)').length;
+  const gfs = f.filter(r=>r['สถานที่']==='กฟส.ท่าอุเทน (XS)').length;
+  const cvs = document.getElementById('donutChart');
+  const ctx = cvs.getContext('2d');
+  const donutData = [
+    {v:gfj, c:'#f5a623', label:'กฟจ.นครพนม'},
+    {v:gfs, c:'#4fc3f7', label:'กฟส.ท่าอุเทน'},
+  ].filter(d=>d.v>0);
+  drawDonut(ctx, donutData);
+  document.getElementById('donutLegend').innerHTML = donutData.map(d=>`
+    <span style="display:flex;align-items:center;gap:4px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${d.c};flex-shrink:0"></span>
+      <span style="color:var(--muted)">${d.label}: <b style="color:var(--text)">${d.v}</b></span>
+    </span>`).join('');
+
+  // Monthly bar
+  const monthFreq = {};
+  f.forEach(r => {
+    if(r.date_iso) {
+      const m = r.date_iso.substring(0,7); // YYYY-MM
+      monthFreq[m] = (monthFreq[m]||0)+1;
+    }
+  });
+  const monthKeys = Object.keys(monthFreq).sort();
+  const monthData = monthKeys.map(k => ({
+    label: MONTHS_TH[parseInt(k.split('-')[1])-1],
+    v: monthFreq[k]
+  }));
+  const mCvs = document.getElementById('monthBar');
+  const mCtx = mCvs.getContext('2d');
+  drawMonthBar(mCtx, monthData);
+
+  // Equipment bars (codes with letters only)
+  const equipOnly = f.filter(r => isEquipCode(r['รหัสอุปกรณ์']||''));
+  const equips = topN(equipOnly,'รหัสอุปกรณ์',10);
+  renderBars('equipBars', equips, 'var(--accent)');
+
+  // Transformer bars (digit-only codes)
+  const transOnly = f.filter(r => { const c=(r['รหัสอุปกรณ์']||'').trim(); return c && !isEquipCode(c); });
+  const trans = topN(transOnly,'รหัสอุปกรณ์',10);
+  renderBars('transBars', trans, '#a78bfa');
+
+  // Weather bars
+  const weather = topN(f,'สภาพอากาศ',8);
+  renderBars('weatherBars', weather, 'var(--accent2)');
+
+  // Table
+  document.getElementById('tableCount').textContent = `แสดง ${f.length} รายการ`;
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = f.slice(0,200).map((r,i) => {
+    const isGfj = r['สถานที่']==='กฟจ.นครพนม (L)';
+    const badge = isGfj
+      ? `<span class="badge badge-gfj">กฟจ.</span>`
+      : `<span class="badge badge-gfs">กฟส.</span>`;
+    const dur = +r['ระยะเวลาดับ_นาที'] || 0;
+    const durColor = dur > 120 ? 'var(--accent4)' : dur > 60 ? 'var(--accent)' : 'var(--text)';
+    return `<tr>
+      <td style="color:var(--muted)">${r['ลำดับ']}</td>
+      <td>${r['วันที่']}</td>
+      <td>${r['เวลาเริ่ม']} – ${r['เวลาสิ้นสุด']}</td>
+      <td style="color:${durColor};font-weight:600">${dur > 0 ? dur : '—'}</td>
+      <td>${badge}</td>
+      <td style="font-family:monospace;font-size:11px">${r['รหัสอุปกรณ์']||'—'}</td>
+      <td style="text-align:right">${fmt(r['จำนวนผชฟ_กระทบ'])}</td>
+      <td>${r['สาเหตุ']||'—'}</td>
+      <td>${r['สภาพอากาศ']||'—'}</td>
+      <td style="text-align:right">${+r['เวลาแก้ไข_นาที']||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+applyFilters();
+
+} // end init
+</script>
+</body>
+</html>
