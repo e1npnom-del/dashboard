@@ -423,7 +423,7 @@ document.body.insertAdjacentHTML('beforeend',`
     <div style="color:#8b90a8;font-size:12px">event_outage_data.csv</div>
   </div>`);
 
-fetch('event_outage_data.csv?_=' + Date.now())
+fetch('./event_outage_data.csv')
   .then(r => {
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
