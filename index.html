@@ -463,10 +463,14 @@ filtered = [...DATA];
 // Classify: has any English letter → equipment code, else → transformer number
 function isEquipCode(code) { return /[A-Za-z]/.test(code); }
 
-// Init date range
-const dates = DATA.map(d=>d.date_iso).filter(Boolean).sort();
-document.getElementById('dateFrom').value = dates[0];
-document.getElementById('dateTo').value = dates[dates.length-1];
+// Init date range — กรองเฉพาะ date_iso ที่ valid (YYYY-MM-DD)
+const dates = DATA.map(d=>d.date_iso)
+  .filter(d => d && /^\d{4}-\d{2}-\d{2}$/.test(d))
+  .sort();
+const minDate = dates[0] || '2020-01-01';
+const maxDate = dates[dates.length-1] || new Date().toISOString().slice(0,10);
+document.getElementById('dateFrom').value = minDate;
+document.getElementById('dateTo').value = maxDate;
 
 // Build equipment & transformer dropdowns
 function buildSelects() {
@@ -493,8 +497,8 @@ buildSelects();
 
 function resetFilters() {
   document.getElementById('locationSel').value = 'all';
-  document.getElementById('dateFrom').value = dates[0];
-  document.getElementById('dateTo').value = dates[dates.length-1];
+  document.getElementById('dateFrom').value = minDate;
+  document.getElementById('dateTo').value = maxDate;
   document.getElementById('equipSel').value = '';
   document.getElementById('transSel').value = '';
   applyFilters();

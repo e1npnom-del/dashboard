@@ -11,8 +11,10 @@ THAI_MONTHS = {
     'ก.ย.':'09','ต.ค.':'10','พ.ย.':'11','ธ.ค.':'12'
 }
 
+THAI_DIGITS = str.maketrans('๐๑๒๓๔๕๖๗๘๙', '0123456789')
+
 def parse_date(s):
-    s = str(s).strip()
+    s = str(s).strip().translate(THAI_DIGITS)
     for th, num in THAI_MONTHS.items():
         s = s.replace(th, num)
     parts = s.split()
@@ -20,9 +22,7 @@ def parse_date(s):
         d, m, y = parts
         try: return f'{int(y)-543}-{m}-{int(d):02d}'
         except: pass
-    return s
-
-THAI_DIGITS = str.maketrans('๐๑๒๓๔๕๖๗๘๙', '0123456789')
+    return ''
 
 def cell(v):
     if v is None: return ''
