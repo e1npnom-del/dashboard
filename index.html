@@ -362,13 +362,18 @@
 
 // ── โหลด CSV จาก GitHub โดยตรง ─────────────────────────────────
 const THAI_MONTHS = {'ม.ค.':'01','ก.พ.':'02','มี.ค.':'03','เม.ย.':'04','พ.ค.':'05','มิ.ย.':'06','ก.ค.':'07','ส.ค.':'08','ก.ย.':'09','ต.ค.':'10','พ.ย.':'11','ธ.ค.':'12'};
+const THAI_DIGITS = {'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
+
+function toArabic(s){ return s.replace(/[๐-๙]/g, d=>THAI_DIGITS[d]||d); }
 
 function parseDate(s){
-  s=s.trim();
+  s=toArabic(s.trim());
   Object.entries(THAI_MONTHS).forEach(([t,n])=>{s=s.replace(t,n);});
   const p=s.split(' ');
   if(p.length===3){try{return `${+p[2]-543}-${p[1]}-${p[0].padStart(2,'0')}`;}catch(e){}}
-  return s;
+  // รองรับ date_iso ที่ถูกต้องอยู่แล้ว (YYYY-MM-DD)
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return '';
 }
 
 function parseCSV(text){
@@ -404,7 +409,7 @@ function parseCSV(text){
       'อุปกรณ์_รายการ':r['อุปกรณ์_รายการ']||'',
       'อุปกรณ์_จำนวน':r['อุปกรณ์_จำนวน']||'',
       'หมายเหตุ':r['หมายเหตุ']||'',
-      'date_iso':parseDate(r['วันที่']||''),
+      'date_iso': parseDate(r['date_iso']||r['วันที่']||''),
     };
   });
 }
