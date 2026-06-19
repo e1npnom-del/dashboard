@@ -8,18 +8,18 @@
   @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
 
   :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --card: #20232e;
-    --border: #2c3044;
-    --accent: #f5a623;
-    --accent2: #4fc3f7;
-    --accent3: #81c784;
-    --accent4: #ef5350;
-    --text: #e8eaf0;
-    --muted: #8b90a8;
-    --gfj: #f5a623;
-    --gfs: #4fc3f7;
+    --bg: #0a0c12;
+    --surface: #161922;
+    --card: #1c2030;
+    --border: #3a4060;
+    --accent: #ffb74d;
+    --accent2: #5ccfff;
+    --accent3: #8bd99a;
+    --accent4: #ff6b6b;
+    --text: #ffffff;
+    --muted: #aab2cc;
+    --gfj: #ffb74d;
+    --gfs: #5ccfff;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -141,8 +141,8 @@
   .kpi.k2::before { background: var(--accent2); }
   .kpi.k3::before { background: var(--accent4); }
   .kpi.k4::before { background: var(--accent3); }
-  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-  .kpi-val { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+  .kpi-label { font-size: 11.5px; color: #c8cee0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .kpi-val { font-size: 30px; font-weight: 800; color: var(--text); line-height: 1; }
   .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
   /* GRID 2-COL */
@@ -156,11 +156,12 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   }
   .card-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #c8cee0;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 14px;
@@ -177,7 +178,7 @@
   /* BAR CHART */
   .bar-chart { display: flex; flex-direction: column; gap: 8px; }
   .bar-row { display: flex; align-items: center; gap: 8px; }
-  .bar-label { width: 180px; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; text-align: right; }
+  .bar-label { width: 180px; font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; text-align: right; }
   .bar-track { flex: 1; background: rgba(255,255,255,0.05); border-radius: 3px; height: 8px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
   .bar-count { width: 32px; font-size: 11px; color: var(--muted); text-align: right; flex-shrink: 0; }
@@ -193,15 +194,15 @@
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   thead th {
     position: sticky; top: 0;
-    background: #252836;
-    color: var(--muted);
-    font-weight: 600;
+    background: #2a3045;
+    color: #d5dae8;
+    font-weight: 700;
     text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
+    padding: 9px 10px;
+    border-bottom: 2px solid var(--border);
     white-space: nowrap;
   }
-  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background .1s; }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.08); transition: background .1s; }
   tbody tr:hover { background: rgba(255,255,255,0.03); }
   tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; }
   .badge {
@@ -247,8 +248,6 @@
     <label>การไฟฟ้าสาขา</label>
     <select id="locationSel" onchange="applyFilters()">
       <option value="all">ทั้งหมด</option>
-      <option value="กฟจ.นครพนม (L)">กฟจ.นครพนม</option>
-      <option value="กฟส.ท่าอุเทน (XS)">กฟส.ท่าอุเทน</option>
     </select>
   </div>
 
@@ -325,7 +324,7 @@
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>สัดส่วนตามสาขา</div>
       <canvas id="donutChart" width="220" height="220" style="margin:0 auto;display:block"></canvas>
-      <div id="donutLegend" style="display:flex;gap:12px;justify-content:center;margin-top:10px;font-size:11px"></div>
+      <div id="donutLegend" style="display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-top:12px;font-size:11px"></div>
     </div>
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>จำนวนเหตุการณ์รายเดือน</div>
@@ -502,6 +501,23 @@ const maxDate = dates[dates.length-1] || new Date().toISOString().slice(0,10);
 document.getElementById('dateFrom').value = minDate;
 document.getElementById('dateTo').value = maxDate;
 
+// Build location dropdown จากข้อมูลจริง (เรียงตามความถี่)
+function buildLocationSelect() {
+  const freq = {};
+  DATA.forEach(r => {
+    const loc = (r['สถานที่']||'').trim();
+    if(loc) freq[loc] = (freq[loc]||0)+1;
+  });
+  const sel = document.getElementById('locationSel');
+  Object.entries(freq).sort((a,b)=>b[1]-a[1]).forEach(([loc,cnt])=>{
+    const o = document.createElement('option');
+    o.value = loc;
+    o.textContent = `${loc} (${cnt})`;
+    sel.appendChild(o);
+  });
+}
+buildLocationSelect();
+
 // Build equipment / transformer / meter dropdowns
 function buildSelects() {
   const eFreq = {}, tFreq = {}, mFreq = {};
@@ -669,15 +685,14 @@ function render() {
   const causes = topN(f,'สาเหตุ',8);
   renderBars('causeBars', causes, 'var(--accent4)');
 
-  // Donut
-  const gfj = f.filter(r=>r['สถานที่']==='กฟจ.นครพนม (L)').length;
-  const gfs = f.filter(r=>r['สถานที่']==='กฟส.ท่าอุเทน (XS)').length;
+  // Donut — รองรับทุกสาขาอัตโนมัติ
+  const PALETTE = ['#f5a623','#4fc3f7','#81c784','#ef5350','#a78bfa','#4dd0e1','#ffb74d','#f06292','#9ccc65','#64b5f6','#ba68c8'];
+  const locFreq = {};
+  f.forEach(r => { const loc=(r['สถานที่']||'').trim(); if(loc) locFreq[loc]=(locFreq[loc]||0)+1; });
+  const sortedLocs = Object.entries(locFreq).sort((a,b)=>b[1]-a[1]);
   const cvs = document.getElementById('donutChart');
   const ctx = cvs.getContext('2d');
-  const donutData = [
-    {v:gfj, c:'#f5a623', label:'กฟจ.นครพนม'},
-    {v:gfs, c:'#4fc3f7', label:'กฟส.ท่าอุเทน'},
-  ].filter(d=>d.v>0);
+  const donutData = sortedLocs.map(([loc,cnt],i)=>({v:cnt, c:PALETTE[i%PALETTE.length], label:loc.replace(/\s*\([A-Z]+\)$/,'')}));
   drawDonut(ctx, donutData);
   document.getElementById('donutLegend').innerHTML = donutData.map(d=>`
     <span style="display:flex;align-items:center;gap:4px">
@@ -725,10 +740,11 @@ function render() {
   document.getElementById('tableCount').textContent = `แสดง ${f.length} รายการ`;
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = f.slice(0,200).map((r,i) => {
-    const isGfj = r['สถานที่']==='กฟจ.นครพนม (L)';
-    const badge = isGfj
-      ? `<span class="badge badge-gfj">กฟจ.</span>`
-      : `<span class="badge badge-gfs">กฟส.</span>`;
+    const locFull = (r['สถานที่']||'').trim();
+    const shortCode = locFull.match(/^(กฟ[จส]\.[^\s(]+)/)?.[1] || locFull;
+    const sizeTag = locFull.match(/\(([A-Z]+)\)/)?.[1] || '';
+    const badgeColor = sizeTag==='L' ? 'var(--gfj)' : sizeTag==='S' ? '#81c784' : 'var(--gfs)';
+    const badge = `<span class="badge" style="background:${badgeColor}22;color:${badgeColor}">${shortCode}</span>`;
     const dur = +r['ระยะเวลาดับ_นาที'] || 0;
     const durColor = dur > 120 ? 'var(--accent4)' : dur > 60 ? 'var(--accent)' : 'var(--text)';
     return `<tr>
