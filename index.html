@@ -73,8 +73,18 @@
     font-size: 13px;
     cursor: pointer;
     min-width: 160px;
+    position: relative;
+    z-index: 1;
   }
-  .filter-group input[type="date"] { min-width: 130px; }
+  .filter-group input[type="date"] {
+    min-width: 150px;
+    cursor: text;
+    color-scheme: dark;
+  }
+  .filter-group input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: invert(0.7);
+  }
   .filter-group select:focus, .filter-group input:focus { outline: none; border-color: var(--accent); }
 
   /* pill buttons - kept for potential use */
@@ -138,6 +148,7 @@
   /* GRID 2-COL */
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 
   /* CARDS */
   .card {
@@ -215,7 +226,7 @@
 
   @media (max-width: 900px) {
     .kpi-row { grid-template-columns: repeat(2,1fr); }
-    .grid2, .grid3 { grid-template-columns: 1fr; }
+    .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
     .bar-label { width: 120px; }
   }
 </style>
@@ -261,10 +272,18 @@
     </select>
   </div>
 
-  <!-- Transformer number (digits only) -->
+  <!-- Transformer number (digits + dash) -->
   <div class="filter-group">
     <label>หมายเลขหม้อแปลง</label>
     <select id="transSel" onchange="applyFilters()">
+      <option value="">ทั้งหมด</option>
+    </select>
+  </div>
+
+  <!-- Meter number (digits only, no dash) -->
+  <div class="filter-group">
+    <label>หมายเลขมิเตอร์</label>
+    <select id="meterSel" onchange="applyFilters()">
       <option value="">ทั้งหมด</option>
     </select>
   </div>
@@ -315,15 +334,19 @@
   </div>
 
   <!-- Row 2: equipment hotspot + transformer + weather -->
-  <div class="grid3">
+  <div class="grid4">
 
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--accent)"></span>รหัสอุปกรณ์ที่เกิดเหตุบ่อย (Top 10)</div>
       <div class="bar-chart" id="equipBars"></div>
     </div>
     <div class="card">
-      <div class="card-title"><span class="dot" style="background:var(--accent)"></span>หมายเลขหม้อแปลงที่เกิดเหตุบ่อย (Top 10)</div>
+      <div class="card-title"><span class="dot" style="background:#a78bfa"></span>หมายเลขหม้อแปลงที่เกิดเหตุบ่อย (Top 10)</div>
       <div class="bar-chart" id="transBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:#4dd0e1"></span>หมายเลขมิเตอร์ที่เกิดเหตุบ่อย (Top 10)</div>
+      <div class="bar-chart" id="meterBars"></div>
     </div>
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--muted)"></span>สภาพอากาศขณะเกิดเหตุ</div>
@@ -467,6 +490,8 @@ filtered = [...DATA];
 
 // Classify: has any English letter → equipment code, else → transformer number
 function isEquipCode(code) { return /[A-Za-z]/.test(code); }
+function isMeterCode(code) { return /^\d+$/.test(code); }       // ตัวเลขล้วน ไม่มี -
+function isTransCode(code) { return code && !isEquipCode(code) && !isMeterCode(code); } // มี - ไม่มีตัวอักษร
 
 // Init date range — กรองเฉพาะ date_iso ที่ valid (YYYY-MM-DD)
 const dates = DATA.map(d=>d.date_iso)
@@ -477,13 +502,14 @@ const maxDate = dates[dates.length-1] || new Date().toISOString().slice(0,10);
 document.getElementById('dateFrom').value = minDate;
 document.getElementById('dateTo').value = maxDate;
 
-// Build equipment & transformer dropdowns
+// Build equipment / transformer / meter dropdowns
 function buildSelects() {
-  const eFreq = {}, tFreq = {};
+  const eFreq = {}, tFreq = {}, mFreq = {};
   DATA.forEach(r => {
     const code = (r['รหัสอุปกรณ์']||'').trim();
     if(!code) return;
     if(isEquipCode(code)) eFreq[code] = (eFreq[code]||0)+1;
+    else if(isMeterCode(code)) mFreq[code] = (mFreq[code]||0)+1;
     else tFreq[code] = (tFreq[code]||0)+1;
   });
   const fill = (selId, freq) => {
@@ -497,6 +523,7 @@ function buildSelects() {
   };
   fill('equipSel', eFreq);
   fill('transSel', tFreq);
+  fill('meterSel', mFreq);
 }
 buildSelects();
 
@@ -506,6 +533,7 @@ function resetFilters() {
   document.getElementById('dateTo').value = maxDate;
   document.getElementById('equipSel').value = '';
   document.getElementById('transSel').value = '';
+  document.getElementById('meterSel').value = '';
   applyFilters();
 }
 
@@ -515,6 +543,7 @@ function applyFilters() {
   const to   = document.getElementById('dateTo').value;
   const eq   = document.getElementById('equipSel').value;
   const tr   = document.getElementById('transSel').value;
+  const mt   = document.getElementById('meterSel').value;
 
   filtered = DATA.filter(r => {
     if(loc !== 'all' && r['สถานที่'] !== loc) return false;
@@ -522,6 +551,7 @@ function applyFilters() {
     if(to   && r.date_iso > to)   return false;
     if(eq && r['รหัสอุปกรณ์'] !== eq) return false;
     if(tr && r['รหัสอุปกรณ์'] !== tr) return false;
+    if(mt && r['รหัสอุปกรณ์'] !== mt) return false;
     return true;
   });
 
@@ -677,10 +707,15 @@ function render() {
   const equips = topN(equipOnly,'รหัสอุปกรณ์',10);
   renderBars('equipBars', equips, 'var(--accent)');
 
-  // Transformer bars (digit-only codes)
-  const transOnly = f.filter(r => { const c=(r['รหัสอุปกรณ์']||'').trim(); return c && !isEquipCode(c); });
+  // Transformer bars (มี - ไม่มีตัวอักษร)
+  const transOnly = f.filter(r => isTransCode((r['รหัสอุปกรณ์']||'').trim()));
   const trans = topN(transOnly,'รหัสอุปกรณ์',10);
   renderBars('transBars', trans, '#a78bfa');
+
+  // Meter bars (ตัวเลขล้วน ไม่มี -)
+  const meterOnly = f.filter(r => isMeterCode((r['รหัสอุปกรณ์']||'').trim()));
+  const meters = topN(meterOnly,'รหัสอุปกรณ์',10);
+  renderBars('meterBars', meters, '#4dd0e1');
 
   // Weather bars
   const weather = topN(f,'สภาพอากาศ',8);
