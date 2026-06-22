@@ -111,6 +111,8 @@ function clickBarFilter(selectId, value) {
 }
 
 function resetFilters() {
+  // ปิด listener ชั่วคราวด้วย flag ป้องกัน onchange ของ date input trigger applyFilters ซ้อน
+  window._resetting = true;
   selectedMonth = null;
   document.getElementById('locationSel').value = 'all';
   document.getElementById('dateFrom').value = window._minDate || '';
@@ -119,6 +121,7 @@ function resetFilters() {
   document.getElementById('transSel').value = '';
   document.getElementById('meterSel').value = '';
   rebuildCodeSelects('all');
+  window._resetting = false;
   applyFilters();
 }
 
@@ -370,13 +373,18 @@ function render() {
       <span style="color:var(--muted)">${d.label}: <b style="color:var(--text)">${d.v}</b></span>
     </span>`).join('');
 
-  // Monthly bar — คำนวณจาก data ที่กรองด้วย สถานที่+รหัส แต่ไม่ติด selectedMonth
+  // Monthly bar — คำนวณจาก data ที่กรองด้วย สถานที่+รหัส+dateFrom/To เท่านั้น (ไม่ติด selectedMonth)
+  // เพื่อให้เห็นทุกเดือนในช่วงที่เลือก และ count ตรงกับ filtered จริงๆ
   const locNow=document.getElementById('locationSel').value;
   const eqNow =document.getElementById('equipSel').value;
   const trNow =document.getElementById('transSel').value;
   const mtNow =document.getElementById('meterSel').value;
+  const fromNow=window._minDate||'';  // ใช้ full date range เสมอเพื่อแสดงทุกเดือน
+  const toNow  =window._maxDate||'';
   const baseForMonths=DATA.filter(r=>{
     if(locNow!=='all'&&r['สถานที่']!==locNow) return false;
+    if(fromNow&&r.date_iso&&r.date_iso<fromNow) return false;
+    if(toNow  &&r.date_iso&&r.date_iso>toNow)   return false;
     const code=(r['รหัสอุปกรณ์']||'').trim();
     if(eqNow&&code!==eqNow) return false;
     if(trNow&&code!==trNow) return false;
@@ -467,9 +475,14 @@ function init() {
     applyFilters();
   });
 
-  // date inputs ล้าง selectedMonth
-  document.getElementById('dateFrom').addEventListener('change', ()=>{ selectedMonth=null; applyFilters(); });
-  document.getElementById('dateTo').addEventListener('change', ()=>{ selectedMonth=null; applyFilters(); });
+  // date inputs ล้าง selectedMonth — ป้องกัน trigger ซ้อนตอน reset
+  document.getElementById('dateFrom').addEventListener('change', ()=>{ if(window._resetting) return; selectedMonth=null; applyFilters(); });
+  document.getElementById('dateTo').addEventListener('change', ()=>{ if(window._resetting) return; selectedMonth=null; applyFilters(); });
+
+  // code selects
+  document.getElementById('equipSel').addEventListener('change', ()=>{ if(window._resetting) return; applyFilters(); });
+  document.getElementById('transSel').addEventListener('change', ()=>{ if(window._resetting) return; applyFilters(); });
+  document.getElementById('meterSel').addEventListener('change', ()=>{ if(window._resetting) return; applyFilters(); });
 
   applyFilters();
 }

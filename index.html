@@ -28,19 +28,19 @@
   <!-- Date from -->
   <div class="filter-group">
     <label>วันที่เริ่มต้น</label>
-    <input type="date" id="dateFrom" onchange="selectedMonth=null;applyFilters()">
+    <input type="date" id="dateFrom">
   </div>
 
   <!-- Date to -->
   <div class="filter-group">
     <label>วันที่สิ้นสุด</label>
-    <input type="date" id="dateTo" onchange="selectedMonth=null;applyFilters()">
+    <input type="date" id="dateTo">
   </div>
 
   <!-- Equipment code (has letters) -->
   <div class="filter-group">
     <label>รหัสอุปกรณ์</label>
-    <select id="equipSel" onchange="applyFilters()">
+    <select id="equipSel">
       <option value="">ทั้งหมด</option>
     </select>
   </div>
@@ -48,7 +48,7 @@
   <!-- Transformer number (digits + dash) -->
   <div class="filter-group">
     <label>หมายเลขหม้อแปลง</label>
-    <select id="transSel" onchange="applyFilters()">
+    <select id="transSel">
       <option value="">ทั้งหมด</option>
     </select>
   </div>
@@ -56,7 +56,7 @@
   <!-- Meter number (digits only, no dash) -->
   <div class="filter-group">
     <label>หมายเลขมิเตอร์</label>
-    <select id="meterSel" onchange="applyFilters()">
+    <select id="meterSel">
       <option value="">ทั้งหมด</option>
     </select>
   </div>
