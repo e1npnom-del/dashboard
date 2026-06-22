@@ -177,7 +177,9 @@
 
   /* BAR CHART */
   .bar-chart { display: flex; flex-direction: column; gap: 8px; }
-  .bar-row { display: flex; align-items: center; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; transition: background .15s; }
+  .bar-row[onclick]:hover { background: rgba(255,255,255,0.06); }
+  .bar-row[onclick]:hover .bar-label { color: var(--accent); }
   .bar-label { width: 180px; font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; text-align: right; }
   .bar-track { flex: 1; background: rgba(255,255,255,0.05); border-radius: 3px; height: 8px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
@@ -246,7 +248,7 @@
   <!-- Location dropdown -->
   <div class="filter-group">
     <label>การไฟฟ้าสาขา</label>
-    <select id="locationSel" onchange="applyFilters()">
+    <select id="locationSel">
       <option value="all">ทั้งหมด</option>
     </select>
   </div>
@@ -518,30 +520,86 @@ function buildLocationSelect() {
 }
 buildLocationSelect();
 
-// Build equipment / transformer / meter dropdowns
-function buildSelects() {
+// Build equipment / transformer / meter dropdowns — กรองตามสถานที่ที่เลือก
+function buildSelects(locFilter) {
   const eFreq = {}, tFreq = {}, mFreq = {};
   DATA.forEach(r => {
+    if(locFilter && locFilter!=='all' && r['สถานที่']!==locFilter) return;
     const code = (r['รหัสอุปกรณ์']||'').trim();
     if(!code) return;
     if(isEquipCode(code)) eFreq[code] = (eFreq[code]||0)+1;
     else if(isMeterCode(code)) mFreq[code] = (mFreq[code]||0)+1;
     else tFreq[code] = (tFreq[code]||0)+1;
   });
-  const fill = (selId, freq) => {
+  const fill = (selId, freq, keepValue) => {
     const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">ทั้งหมด</option>';
     Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,40).forEach(([code,cnt])=>{
       const o = document.createElement('option');
       o.value = code;
       o.textContent = `${code} (${cnt})`;
       sel.appendChild(o);
     });
+    if(keepValue && freq[keepValue]) sel.value = keepValue;
   };
-  fill('equipSel', eFreq);
-  fill('transSel', tFreq);
-  fill('meterSel', mFreq);
+  return fill;
 }
-buildSelects();
+
+function rebuildCodeSelects(locFilter, keep={}) {
+  const fill = buildSelects(locFilter);
+  fill('equipSel', codeFreqByType(locFilter,'equip'), keep.eq);
+  fill('transSel', codeFreqByType(locFilter,'trans'), keep.tr);
+  fill('meterSel', codeFreqByType(locFilter,'meter'), keep.mt);
+}
+
+function codeFreqByType(locFilter, type) {
+  const freq = {};
+  DATA.forEach(r => {
+    if(locFilter && locFilter!=='all' && r['สถานที่']!==locFilter) return;
+    const code = (r['รหัสอุปกรณ์']||'').trim();
+    if(!code) return;
+    const isType = type==='equip' ? isEquipCode(code) : type==='meter' ? isMeterCode(code) : isTransCode(code);
+    if(isType) freq[code] = (freq[code]||0)+1;
+  });
+  return freq;
+}
+
+rebuildCodeSelects('all');
+
+// เมื่อเปลี่ยนสถานที่ → rebuild ตัวเลือก code ใหม่ตามสถานที่
+document.getElementById('locationSel').addEventListener('change', () => {
+  const loc = document.getElementById('locationSel').value;
+  rebuildCodeSelects(loc);
+  applyFilters();
+});
+
+// ── Modal แจ้งเตือน filter ไม่สัมพันธ์กัน ──────────────────────
+function showFilterErrorModal() {
+  let modal = document.getElementById('filterErrorModal');
+  if(!modal) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="filterErrorModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000">
+        <div style="background:var(--card);border:1px solid var(--accent4);border-radius:12px;padding:28px 32px;max-width:340px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+          <div style="font-size:32px;margin-bottom:10px">⚠️</div>
+          <div style="color:var(--text);font-size:15px;font-weight:700;margin-bottom:6px">ฟิลเตอร์ไม่ถูกต้อง</div>
+          <div style="color:var(--muted);font-size:12.5px;margin-bottom:18px">รหัสอุปกรณ์ / หมายเลขหม้อแปลง / หมายเลขมิเตอร์ที่เลือก ไม่ตรงกับสถานที่ที่เลือก</div>
+          <button onclick="document.getElementById('filterErrorModal').remove()" style="background:var(--accent4);color:#fff;border:none;border-radius:6px;padding:8px 20px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;cursor:pointer">ตกลง</button>
+        </div>
+      </div>`);
+  }
+}
+
+// ── Click-to-filter จากกราฟ ──────────────────────────────────
+function filterByBarClick(field, value) {
+  if(field==='สถานที่') {
+    document.getElementById('locationSel').value = value;
+    rebuildCodeSelects(value);
+  } else {
+    const sel = field==='รหัสอุปกรณ์equip' ? 'equipSel' : field==='รหัสอุปกรณ์trans' ? 'transSel' : field==='รหัสอุปกรณ์meter' ? 'meterSel' : null;
+    if(sel) document.getElementById(sel).value = value;
+  }
+  applyFilters();
+}
 
 function resetFilters() {
   document.getElementById('locationSel').value = 'all';
@@ -561,13 +619,31 @@ function applyFilters() {
   const tr   = document.getElementById('transSel').value;
   const mt   = document.getElementById('meterSel').value;
 
+  // ตรวจสอบความสัมพันธ์: ถ้าเลือกสถานที่ + code แต่ code นั้นไม่มีอยู่ในสถานที่นี้ → invalid
+  if(loc !== 'all') {
+    const codesInLoc = new Set(DATA.filter(r=>r['สถานที่']===loc).map(r=>(r['รหัสอุปกรณ์']||'').trim()));
+    const picks = [eq, tr, mt].filter(Boolean);
+    const invalid = picks.some(code => !codesInLoc.has(code));
+    if(invalid) {
+      showFilterErrorModal();
+      // reset code ที่ขัดแย้งกลับเป็นทั้งหมด
+      if(eq && !codesInLoc.has(eq)) document.getElementById('equipSel').value='';
+      if(tr && !codesInLoc.has(tr)) document.getElementById('transSel').value='';
+      if(mt && !codesInLoc.has(mt)) document.getElementById('meterSel').value='';
+    }
+  }
+
+  const eq2 = document.getElementById('equipSel').value;
+  const tr2 = document.getElementById('transSel').value;
+  const mt2 = document.getElementById('meterSel').value;
+
   filtered = DATA.filter(r => {
     if(loc !== 'all' && r['สถานที่'] !== loc) return false;
     if(from && r.date_iso < from) return false;
     if(to   && r.date_iso > to)   return false;
-    if(eq && r['รหัสอุปกรณ์'] !== eq) return false;
-    if(tr && r['รหัสอุปกรณ์'] !== tr) return false;
-    if(mt && r['รหัสอุปกรณ์'] !== mt) return false;
+    if(eq2 && r['รหัสอุปกรณ์'] !== eq2) return false;
+    if(tr2 && r['รหัสอุปกรณ์'] !== tr2) return false;
+    if(mt2 && r['รหัสอุปกรณ์'] !== mt2) return false;
     return true;
   });
 
@@ -588,18 +664,24 @@ function topN(arr, key, n=10) {
   return Object.entries(freq).filter(([k])=>k&&k!=='(ไม่ระบุ)').sort((a,b)=>b[1]-a[1]).slice(0,n);
 }
 
-function renderBars(containerId, data, color='var(--accent)') {
+function renderBars(containerId, data, color='var(--accent)', selectId=null) {
   const el = document.getElementById(containerId);
   if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px">ไม่มีข้อมูล</div>'; return; }
   const max = data[0][1];
   el.innerHTML = data.map(([label, cnt]) => `
-    <div class="bar-row">
+    <div class="bar-row" ${selectId ? `style="cursor:pointer" onclick="clickBarFilter('${selectId}','${label.replace(/'/g,"\\'")}')"` : ''}>
       <div class="bar-label" title="${label}">${label}</div>
       <div class="bar-track">
         <div class="bar-fill" style="width:${(cnt/max*100).toFixed(1)}%;background:${color}"></div>
       </div>
       <div class="bar-count">${cnt}</div>
     </div>`).join('');
+}
+
+// คลิก bar → ตั้งค่า dropdown ตาม + apply filter (ดูสถานที่เป็นหลัก)
+function clickBarFilter(selectId, value) {
+  document.getElementById(selectId).value = value;
+  applyFilters();
 }
 
 function drawDonut(ctx, data) {
@@ -720,17 +802,17 @@ function render() {
   // Equipment bars (codes with letters only)
   const equipOnly = f.filter(r => isEquipCode(r['รหัสอุปกรณ์']||''));
   const equips = topN(equipOnly,'รหัสอุปกรณ์',10);
-  renderBars('equipBars', equips, 'var(--accent)');
+  renderBars('equipBars', equips, 'var(--accent)', 'equipSel');
 
   // Transformer bars (มี - ไม่มีตัวอักษร)
   const transOnly = f.filter(r => isTransCode((r['รหัสอุปกรณ์']||'').trim()));
   const trans = topN(transOnly,'รหัสอุปกรณ์',10);
-  renderBars('transBars', trans, '#a78bfa');
+  renderBars('transBars', trans, '#a78bfa', 'transSel');
 
   // Meter bars (ตัวเลขล้วน ไม่มี -)
   const meterOnly = f.filter(r => isMeterCode((r['รหัสอุปกรณ์']||'').trim()));
   const meters = topN(meterOnly,'รหัสอุปกรณ์',10);
-  renderBars('meterBars', meters, '#4dd0e1');
+  renderBars('meterBars', meters, '#4dd0e1', 'meterSel');
 
   // Weather bars
   const weather = topN(f,'สภาพอากาศ',8);
