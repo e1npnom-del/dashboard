@@ -180,6 +180,7 @@
   .bar-row { display: flex; align-items: center; gap: 8px; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; transition: background .15s; }
   .bar-row[onclick]:hover { background: rgba(255,255,255,0.06); }
   .bar-row[onclick]:hover .bar-label { color: var(--accent); }
+  #monthBar > div:hover .month-bar-fill { filter: brightness(1.25); transform: scaleY(1.02); }
   .bar-label { width: 180px; font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; text-align: right; }
   .bar-track { flex: 1; background: rgba(255,255,255,0.05); border-radius: 3px; height: 8px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
@@ -325,12 +326,12 @@
     </div>
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>สัดส่วนตามสาขา</div>
-      <canvas id="donutChart" width="220" height="220" style="margin:0 auto;display:block"></canvas>
+      <canvas id="donutChart" width="260" height="260" style="margin:0 auto;display:block;max-width:240px;height:auto"></canvas>
       <div id="donutLegend" style="display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-top:12px;font-size:11px"></div>
     </div>
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>จำนวนเหตุการณ์รายเดือน</div>
-      <canvas id="monthBar" width="300" height="200" style="width:100%;height:auto"></canvas>
+      <div id="monthBar" style="display:flex;align-items:flex-end;gap:8px;height:220px;padding:10px 6px 0"></div>
     </div>
   </div>
 
@@ -608,6 +609,7 @@ function resetFilters() {
   document.getElementById('equipSel').value = '';
   document.getElementById('transSel').value = '';
   document.getElementById('meterSel').value = '';
+  rebuildCodeSelects('all');
   applyFilters();
 }
 
@@ -690,6 +692,7 @@ function drawDonut(ctx, data) {
   const cx=W/2, cy=H/2, r=Math.min(W,H)/2-16, ri=r*0.58;
   const total = data.reduce((s,d)=>s+d.v,0);
   let angle = -Math.PI/2;
+  const slices = []; // เก็บมุมไว้สำหรับ hit-test ตอนคลิก
   data.forEach(d => {
     const sweep = (d.v/total)*Math.PI*2;
     ctx.beginPath();
@@ -698,6 +701,7 @@ function drawDonut(ctx, data) {
     ctx.closePath();
     ctx.fillStyle = d.c;
     ctx.fill();
+    slices.push({start:angle, end:angle+sweep, loc:d.locValue});
     angle += sweep;
   });
   // hole
@@ -714,40 +718,57 @@ function drawDonut(ctx, data) {
   ctx.font = '11px Sarabun, sans-serif';
   ctx.fillStyle = '#8b90a8';
   ctx.fillText('ครั้ง', cx, cy+12);
+
+  // เก็บข้อมูล hit-test ไว้กับ canvas element
+  ctx.canvas._donutSlices = slices;
+  ctx.canvas._donutCenter = {cx, cy, r, ri};
 }
 
-function drawMonthBar(ctx, data) {
-  const W = ctx.canvas.width, H = ctx.canvas.height;
-  ctx.clearRect(0,0,W,H);
-  if(!data.length) return;
-  const pad = {t:10,r:10,b:30,l:30};
-  const cw = W-pad.l-pad.r, ch = H-pad.t-pad.b;
-  const max = Math.max(...data.map(d=>d.v));
-  const bw = cw/data.length - 4;
-
-  data.forEach((d,i) => {
-    const x = pad.l + i*(cw/data.length) + 2;
-    const bh = max ? (d.v/max)*ch : 0;
-    const y = pad.t + ch - bh;
-    // bar
-    const isGfj = d.label.includes('L') || !d.label;
-    ctx.fillStyle = d.loc === 'mix' ? 'var(--accent)' : (d.loc==='gfj'?'#f5a623':'#4fc3f7');
-    ctx.fillStyle = 'var(--accent)';
-    ctx.beginPath();
-    ctx.roundRect(x, y, bw, bh, [3,3,0,0]);
-    ctx.fill();
-    // label
-    ctx.fillStyle = '#8b90a8';
-    ctx.font = '9px Sarabun, sans-serif';
-    ctx.textAlign='center';
-    ctx.fillText(d.label, x+bw/2, pad.t+ch+14);
-    // value
-    if(d.v>0) {
-      ctx.fillStyle = '#e8eaf0';
-      ctx.font = '9px Sarabun, sans-serif';
-      ctx.fillText(d.v, x+bw/2, y-4);
+function setupDonutClick(canvas) {
+  if(canvas._clickBound) return;
+  canvas._clickBound = true;
+  canvas.style.cursor = 'pointer';
+  canvas.addEventListener('click', e => {
+    const slices = canvas._donutSlices, center = canvas._donutCenter;
+    if(!slices || !center) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX - center.cx;
+    const y = (e.clientY - rect.top) * scaleY - center.cy;
+    const dist = Math.sqrt(x*x + y*y);
+    if(dist < center.ri || dist > center.r) return; // คลิกนอกวง donut หรือในรูตรงกลาง
+    let a = Math.atan2(y, x);
+    if(a < -Math.PI/2) a += Math.PI*2; // ปรับให้ตรงกับมุมเริ่มที่ -PI/2
+    const slice = slices.find(s => a >= s.start && a <= s.end);
+    if(slice && slice.loc) {
+      document.getElementById('locationSel').value = slice.loc;
+      rebuildCodeSelects(slice.loc);
+      applyFilters();
     }
   });
+}
+
+function renderMonthBars(containerId, data) {
+  const el = document.getElementById(containerId);
+  if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;margin:auto">ไม่มีข้อมูล</div>'; return; }
+  const max = Math.max(...data.map(d=>d.v), 1);
+  el.innerHTML = data.map(d => {
+    const hPct = Math.max((d.v/max*100), 3);
+    return `
+    <div onclick="filterByMonth('${d.key}')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;gap:6px" title="คลิกเพื่อดูเฉพาะ ${d.label}">
+      <div style="font-size:13px;font-weight:700;color:var(--text)">${d.v}</div>
+      <div class="month-bar-fill" style="width:100%;max-width:42px;height:${hPct}%;background:linear-gradient(180deg,#5ccfff,#3aa8e0);border-radius:6px 6px 0 0;transition:filter .15s,transform .15s"></div>
+      <div style="font-size:11.5px;font-weight:600;color:#c8cee0">${d.label}</div>
+    </div>`;
+  }).join('');
+}
+
+function filterByMonth(monthKey) {
+  document.getElementById('dateFrom').value = monthKey + '-01';
+  const [y,m] = monthKey.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  document.getElementById('dateTo').value = `${monthKey}-${String(lastDay).padStart(2,'0')}`;
+  applyFilters();
 }
 
 const MONTHS_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -774,10 +795,11 @@ function render() {
   const sortedLocs = Object.entries(locFreq).sort((a,b)=>b[1]-a[1]);
   const cvs = document.getElementById('donutChart');
   const ctx = cvs.getContext('2d');
-  const donutData = sortedLocs.map(([loc,cnt],i)=>({v:cnt, c:PALETTE[i%PALETTE.length], label:loc.replace(/\s*\([A-Z]+\)$/,'')}));
+  const donutData = sortedLocs.map(([loc,cnt],i)=>({v:cnt, c:PALETTE[i%PALETTE.length], label:loc.replace(/\s*\([A-Z]+\)$/,''), locValue:loc}));
   drawDonut(ctx, donutData);
+  setupDonutClick(cvs);
   document.getElementById('donutLegend').innerHTML = donutData.map(d=>`
-    <span style="display:flex;align-items:center;gap:4px">
+    <span onclick="document.getElementById('locationSel').value='${d.locValue}';rebuildCodeSelects('${d.locValue}');applyFilters()" style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
       <span style="width:8px;height:8px;border-radius:50%;background:${d.c};flex-shrink:0"></span>
       <span style="color:var(--muted)">${d.label}: <b style="color:var(--text)">${d.v}</b></span>
     </span>`).join('');
@@ -792,12 +814,11 @@ function render() {
   });
   const monthKeys = Object.keys(monthFreq).sort();
   const monthData = monthKeys.map(k => ({
+    key: k,
     label: MONTHS_TH[parseInt(k.split('-')[1])-1],
     v: monthFreq[k]
   }));
-  const mCvs = document.getElementById('monthBar');
-  const mCtx = mCvs.getContext('2d');
-  drawMonthBar(mCtx, monthData);
+  renderMonthBars('monthBar', monthData);
 
   // Equipment bars (codes with letters only)
   const equipOnly = f.filter(r => isEquipCode(r['รหัสอุปกรณ์']||''));
