@@ -457,6 +457,15 @@ function init() {
   document.getElementById('dateFrom').value=minDate;
   document.getElementById('dateTo').value=maxDate;
 
+  // อัพเดท header แสดงช่วงวันที่จริงจาก DATA
+  const MONTHS_TH_SHORT=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  function isoToThaiShort(iso) {
+    const [y,m,d]=iso.split('-').map(Number);
+    return `${d} ${MONTHS_TH_SHORT[m-1]} ${y+543}`;
+  }
+  const el=document.getElementById('headerDateRange');
+  if(el) el.textContent=`ข้อมูล ${isoToThaiShort(minDate)} – ${isoToThaiShort(maxDate)}`;
+
   // Build location dropdown
   const locFreq={};
   DATA.forEach(r=>{ const loc=(r['สถานที่']||'').trim(); if(loc) locFreq[loc]=(locFreq[loc]||0)+1; });
