@@ -350,8 +350,17 @@ function render() {
   const avgFix=f.length?Math.round(totalFix/f.length):0;
   document.getElementById('kpiAvgFix').textContent=avgFix;
 
-  // Cause bars (ไม่ filter ตาม click)
-  renderBars('causeBars', topN(f,'สาเหตุ',8), 'var(--accent4)');
+  // Cause bars — แปลงค่าว่าง/— เป็น "ไม่พบสาเหตุ"
+  const causeData = (() => {
+    const freq = {};
+    f.forEach(r => {
+      let k = (r['สาเหตุ'] || '').trim();
+      if (!k || k === '—' || k === '-') k = 'ไม่พบสาเหตุ';
+      freq[k] = (freq[k] || 0) + 1;
+    });
+    return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  })();
+  renderBars('causeBars', causeData, 'var(--accent4)');
 
   // Donut by location
   const PALETTE=['#f5a623','#4fc3f7','#81c784','#ef5350','#a78bfa','#4dd0e1','#ffb74d','#f06292','#9ccc65','#64b5f6','#ba68c8'];
