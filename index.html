@@ -17,12 +17,22 @@
 </div>
 
 <div class="filter-bar">
-  <!-- Location dropdown -->
+  <!-- Location searchable dropdown -->
   <div class="filter-group">
     <label>การไฟฟ้าสาขา</label>
-    <select id="locationSel">
-      <option value="all">ทั้งหมด</option>
-    </select>
+    <div class="sd-wrap" id="sd-locationSel">
+      <div class="sd-display" tabindex="0">
+        <span class="sd-label">ทั้งหมด</span>
+        <span class="sd-arrow">▾</span>
+      </div>
+      <div class="sd-panel">
+        <input class="sd-search" type="text" placeholder="ค้นหา..." autocomplete="off">
+        <div class="sd-list"></div>
+      </div>
+      <select id="locationSel" style="display:none">
+        <option value="all">ทั้งหมด</option>
+      </select>
+    </div>
   </div>
 
   <!-- Date from -->
@@ -37,28 +47,58 @@
     <input type="date" id="dateTo">
   </div>
 
-  <!-- Equipment code (has letters) -->
+  <!-- Equipment code searchable dropdown -->
   <div class="filter-group">
     <label>รหัสอุปกรณ์</label>
-    <select id="equipSel">
-      <option value="">ทั้งหมด</option>
-    </select>
+    <div class="sd-wrap" id="sd-equipSel">
+      <div class="sd-display" tabindex="0">
+        <span class="sd-label">ทั้งหมด</span>
+        <span class="sd-arrow">▾</span>
+      </div>
+      <div class="sd-panel">
+        <input class="sd-search" type="text" placeholder="ค้นหา..." autocomplete="off">
+        <div class="sd-list"></div>
+      </div>
+      <select id="equipSel" style="display:none">
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
   </div>
 
-  <!-- Transformer number (digits + dash) -->
+  <!-- Transformer number searchable dropdown -->
   <div class="filter-group">
     <label>หมายเลขหม้อแปลง</label>
-    <select id="transSel">
-      <option value="">ทั้งหมด</option>
-    </select>
+    <div class="sd-wrap" id="sd-transSel">
+      <div class="sd-display" tabindex="0">
+        <span class="sd-label">ทั้งหมด</span>
+        <span class="sd-arrow">▾</span>
+      </div>
+      <div class="sd-panel">
+        <input class="sd-search" type="text" placeholder="ค้นหา..." autocomplete="off">
+        <div class="sd-list"></div>
+      </div>
+      <select id="transSel" style="display:none">
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
   </div>
 
-  <!-- Meter number (digits only, no dash) -->
+  <!-- Meter number searchable dropdown -->
   <div class="filter-group">
     <label>หมายเลขมิเตอร์</label>
-    <select id="meterSel">
-      <option value="">ทั้งหมด</option>
-    </select>
+    <div class="sd-wrap" id="sd-meterSel">
+      <div class="sd-display" tabindex="0">
+        <span class="sd-label">ทั้งหมด</span>
+        <span class="sd-arrow">▾</span>
+      </div>
+      <div class="sd-panel">
+        <input class="sd-search" type="text" placeholder="ค้นหา..." autocomplete="off">
+        <div class="sd-list"></div>
+      </div>
+      <select id="meterSel" style="display:none">
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
   </div>
 
   <button class="reset-btn" onclick="resetFilters()">↺ รีเซ็ต</button>
@@ -154,5 +194,213 @@
 </div>
 
 <script src="app.js"></script>
+
+<style>
+/* ── Searchable Dropdown ── */
+.sd-wrap {
+  position: relative;
+  min-width: 160px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13px;
+  user-select: none;
+}
+.sd-display {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 33px;
+  transition: border-color .15s;
+}
+.sd-display:focus,
+.sd-wrap.open .sd-display { outline: none; border-color: var(--accent); }
+.sd-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-label.selected { color: var(--text); font-weight: 500; }
+.sd-label:not(.selected) { color: var(--muted); }
+.sd-arrow { font-size: 10px; color: var(--muted); flex-shrink: 0; transition: transform .2s; }
+.sd-wrap.open .sd-arrow { transform: rotate(180deg); }
+
+.sd-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 320px;
+  background: #1e2235;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 9999;
+  overflow: hidden;
+}
+.sd-wrap.open .sd-panel { display: block; }
+
+.sd-search {
+  width: 100%;
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+.sd-search::placeholder { color: var(--muted); }
+
+.sd-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.sd-list::-webkit-scrollbar { width: 4px; }
+.sd-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sd-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+  transition: background .1s, color .1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sd-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.sd-item.active { background: rgba(255,183,77,0.12); color: var(--accent); font-weight: 600; }
+.sd-item.no-result { color: var(--muted); font-style: italic; cursor: default; pointer-events: none; }
+</style>
+
+<script>
+// ── Searchable Dropdown Engine ──
+// ใช้ร่วมกับ <select> ที่ซ่อนอยู่ข้างใน — app.js อ่าน select.value ได้เหมือนเดิม
+
+function initSearchableDropdown(wrapId) {
+  const wrap   = document.getElementById(wrapId);
+  const sel    = wrap.querySelector('select');
+  const display= wrap.querySelector('.sd-display');
+  const label  = wrap.querySelector('.sd-label');
+  const panel  = wrap.querySelector('.sd-panel');
+  const search = wrap.querySelector('.sd-search');
+  const list   = wrap.querySelector('.sd-list');
+
+  function getOptions() {
+    return Array.from(sel.options).map(o => ({ value: o.value, text: o.textContent.trim() }));
+  }
+
+  function renderList(q) {
+    const opts = getOptions();
+    const filtered = q ? opts.filter(o => o.text.toLowerCase().includes(q.toLowerCase())) : opts;
+    if (!filtered.length) {
+      list.innerHTML = '<div class="sd-item no-result">ไม่พบรายการ</div>';
+      return;
+    }
+    list.innerHTML = filtered.map(o => `
+      <div class="sd-item${o.value === sel.value ? ' active' : ''}"
+           data-val="${o.value.replace(/"/g,'&quot;')}">${o.text}</div>`).join('');
+    list.querySelectorAll('.sd-item:not(.no-result)').forEach(item => {
+      item.addEventListener('click', () => {
+        sel.value = item.dataset.val;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        syncDisplay();
+        close();
+      });
+    });
+  }
+
+  function syncDisplay() {
+    const cur = Array.from(sel.options).find(o => o.value === sel.value);
+    if (cur) {
+      // ตัดส่วน (XX) จากท้ายชื่อออกเพื่อความกระชับ
+      label.textContent = cur.textContent.trim().replace(/\s*\(\d+\)$/, '') || 'ทั้งหมด';
+      label.classList.toggle('selected', sel.value !== '' && sel.value !== 'all');
+    }
+  }
+
+  function open() {
+    // ปิด dropdown อื่นก่อน
+    document.querySelectorAll('.sd-wrap.open').forEach(w => { if(w!==wrap) w.classList.remove('open'); });
+    wrap.classList.add('open');
+    search.value = '';
+    renderList('');
+    search.focus();
+  }
+
+  function close() {
+    wrap.classList.remove('open');
+    search.value = '';
+  }
+
+  display.addEventListener('click', () => wrap.classList.contains('open') ? close() : open());
+  display.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' ') { e.preventDefault(); open(); } });
+  search.addEventListener('input', () => renderList(search.value));
+  search.addEventListener('keydown', e => {
+    if(e.key==='Escape') close();
+    if(e.key==='Enter') {
+      const first = list.querySelector('.sd-item:not(.no-result)');
+      if(first) first.click();
+    }
+  });
+
+  // ปิดเมื่อคลิกนอก
+  document.addEventListener('click', e => {
+    if(!wrap.contains(e.target)) close();
+  }, true);
+
+  // sync เมื่อ app.js เปลี่ยน sel.value โดยตรง (เช่น resetFilters / clickBarFilter)
+  // ใช้ MutationObserver + custom dispatchEvent แทน เพราะ 'change' จาก JS ไม่ bubble ผ่าน hidden select
+  const origDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  // patch เฉพาะ select นี้ด้วย setter wrapper
+  let _val = sel.value;
+  Object.defineProperty(sel, 'value', {
+    get() { return _val; },
+    set(v) {
+      _val = v;
+      origDescriptor.set.call(sel, v);
+      syncDisplay();
+    },
+    configurable: true
+  });
+
+  // sync เมื่อ innerHTML ของ select เปลี่ยน (rebuildCodeSelects)
+  new MutationObserver(() => {
+    // หลัง rebuild sel.value อาจถูก reset → sync label
+    syncDisplay();
+    // re-render list ถ้าเปิดอยู่
+    if(wrap.classList.contains('open')) renderList(search.value);
+  }).observe(sel, { childList: true });
+
+  syncDisplay();
+  return { syncDisplay, renderList };
+}
+
+// เริ่มต้นหลัง DOM ready — รอ app.js init() เสร็จก่อน (DATA โหลดแล้ว)
+// ใช้ MutationObserver จับว่า #loading ถูกลบ (= init() เสร็จ)
+function setupAllDropdowns() {
+  ['sd-locationSel','sd-equipSel','sd-transSel','sd-meterSel'].forEach(initSearchableDropdown);
+}
+
+const loadingEl = document.getElementById('loading') || document.body;
+if(!document.getElementById('loading')) {
+  setupAllDropdowns();
+} else {
+  new MutationObserver((_, obs) => {
+    if(!document.getElementById('loading')) {
+      obs.disconnect();
+      // รอ 1 tick ให้ init() เพิ่ม options ก่อน
+      setTimeout(setupAllDropdowns, 50);
+    }
+  }).observe(document.body, { childList: true });
+}
+</script>
+
 </body>
 </html>
