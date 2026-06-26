@@ -105,7 +105,6 @@ function _isActive(type, value) {
 // กด filter → push snapshot แล้ว set / กดซ้ำ → pop กลับ
 function pushFilter(type, value, applyFn) {
   if(_isActive(type, value)) {
-    // กดซ้ำ → pop
     if(_filterStack.length) {
       const prev = _filterStack.pop();
       _restoreState(prev);
@@ -116,20 +115,6 @@ function pushFilter(type, value, applyFn) {
     _filterStack.push(_snapState());
     applyFn();
   }
-  _renderBreadcrumb();
-}
-
-function _renderBreadcrumb() {
-  // แสดง breadcrumb indicator เล็กๆ บน filter bar
-  let el = document.getElementById('_filterBreadcrumb');
-  if(!el) {
-    el = document.createElement('div');
-    el.id = '_filterBreadcrumb';
-    el.style.cssText = 'font-size:11px;color:var(--muted);align-self:flex-end;padding-bottom:7px;display:flex;align-items:center;gap:6px;';
-    document.querySelector('.filter-bar').appendChild(el);
-  }
-  if(!_filterStack.length) { el.innerHTML=''; return; }
-  el.innerHTML = `<span style="color:var(--accent3)">⬤</span> ${_filterStack.length} ชั้นฟิลเตอร์ — <span onclick="resetFilters()" style="color:var(--accent4);cursor:pointer;text-decoration:underline">ล้างทั้งหมด</span>`;
 }
 
 function sortTable(col) {
@@ -221,7 +206,6 @@ function resetFilters() {
   setSelectValue('meterSel', '');
   rebuildCodeSelects('all');
   window._resetting = false;
-  _renderBreadcrumb();
   applyFilters();
 }
 
@@ -470,27 +454,31 @@ function render() {
   renderBars('causeBars', causeData, 'var(--accent4)');
 
   // Donut by location — แสดงจาก DATA ทั้งหมด (filter แค่วันที่) slice ไม่หาย
-  // 12 สี pastel สบายตา แต่ละ hue ต่างกัน 30°
+  // Categorical palette สำหรับ dark dashboard — mid-sat mid-brightness
+  // อ้างอิง: Tableau 10 + Observable Plot categorical + D3 schemeTableau10
+  // hue step ≥ 25°, sat 55–70%, brightness 65–78% → อ่านง่ายบน #1c2030
   const PALETTE12 = [
-    '#FF8A80', // ชมพูแดง pastel
-    '#FFAB76', // ส้ม pastel
-    '#FFD580', // เหลือง pastel
-    '#B5E88A', // เขียวอ่อน pastel
-    '#69D9A0', // มิ้นท์ pastel
-    '#6FD4D4', // เขียวฟ้า pastel
-    '#7EC8E3', // ฟ้าอ่อน pastel
-    '#82AAFF', // น้ำเงิน pastel
-    '#B39DDB', // ม่วง pastel
-    '#CE93D8', // ม่วงชมพู pastel
-    '#F48FB1', // ชมพู pastel
-    '#BCAAA4', // น้ำตาลอ่อน pastel
+    '#4E9FE5', // ฟ้า (210°)
+    '#F5855A', // ส้มแดง (18°)
+    '#56BF8B', // เขียว (152°)
+    '#E8C23A', // เหลืองทอง (47°)
+    '#A07EE0', // ม่วง (262°)
+    '#E8637A', // ชมพูแดง (350°)
+    '#3BBFBF', // เขียวฟ้า (180°)
+    '#E8964A', // ส้ม (33°)
+    '#6DB3A0', // เขียวมิ้นท์ (165°)
+    '#7B9FD4', // ฟ้าอ่อน (220°)
+    '#C47AB5', // ม่วงชมพู (308°)
+    '#A0B96A', // เขียวเหลือง (82°)
   ];
-  // map สีตาม location name แบบถาวร — สีไม่เปลี่ยนแม้ filter เปลี่ยน
-  if(!window._locColorMap) window._locColorMap={};
-  let _paletteIdx = Object.keys(window._locColorMap).length;
+  // map สีตาม location name แบบถาวร (init ครั้งเดียว) — สีไม่เปลี่ยนเมื่อ filter
+  if(!window._locColorMap) window._locColorMap = {};
+  if(!window._locPaletteIdx) window._locPaletteIdx = 0;
+  let _paletteIdx = window._locPaletteIdx;
   function getLocColor(loc) {
     if(!window._locColorMap[loc]) {
-      window._locColorMap[loc] = PALETTE12[_paletteIdx++ % PALETTE12.length];
+      window._locColorMap[loc] = PALETTE12[_paletteIdx % PALETTE12.length];
+      window._locPaletteIdx = ++_paletteIdx;
     }
     return window._locColorMap[loc];
   }
@@ -681,9 +669,19 @@ function init() {
   const el=document.getElementById('headerDateRange');
   if(el) el.textContent=`ข้อมูล ${isoToThaiShort(minDate)} – ${isoToThaiShort(maxDate)}`;
 
-  // Build location dropdown
+  // Build location dropdown + assign สีถาวรให้แต่ละ location ทันที
+  const LOC_PALETTE = [
+    '#4E9FE5','#F5855A','#56BF8B','#E8C23A','#A07EE0',
+    '#E8637A','#3BBFBF','#E8964A','#6DB3A0','#7B9FD4',
+    '#C47AB5','#A0B96A',
+  ];
+  window._locColorMap = {}; // reset ใหม่ทุกครั้ง init
   const locFreq={};
   DATA.forEach(r=>{ const loc=(r['สถานที่']||'').trim(); if(loc) locFreq[loc]=(locFreq[loc]||0)+1; });
+  // เรียงตาม freq มากไปน้อย แล้ว assign สีตามลำดับ
+  Object.entries(locFreq).sort((a,b)=>b[1]-a[1]).forEach(([loc],i)=>{
+    window._locColorMap[loc] = LOC_PALETTE[i % LOC_PALETTE.length];
+  });
   const sel=document.getElementById('locationSel');
   Object.entries(locFreq).sort((a,b)=>b[1]-a[1]).forEach(([loc,cnt])=>{
     const o=document.createElement('option');
