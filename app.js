@@ -122,12 +122,16 @@ function setSelectValue(id, value) {
 function clickBarFilter(selectId, value) {
   if(selectId === 'locationSel') {
     const cur = document.getElementById('locationSel').value;
-    const next = cur === value ? 'all' : value;  // toggle
+    const next = cur === value ? 'all' : value;
+    // เมื่อเปลี่ยน location ให้ reset selectedMonth และคืน date range
+    selectedMonth=null;
+    document.getElementById('dateFrom').value=window._minDate||'';
+    document.getElementById('dateTo').value=window._maxDate||'';
     setSelectValue('locationSel', next);
     rebuildCodeSelects(next);
   } else {
     const sel = document.getElementById(selectId);
-    setSelectValue(selectId, sel.value === value ? '' : value);  // toggle
+    setSelectValue(selectId, sel.value === value ? '' : value);
   }
   applyFilters();
 }
@@ -332,6 +336,10 @@ function setupDonutClick(canvas) {
     if(slice&&slice.loc){
       const sel=document.getElementById('locationSel');
       const next=sel.value===slice.loc?'all':slice.loc;  // toggle
+      // reset selectedMonth เพื่อคืน date range เดิม
+      selectedMonth=null;
+      document.getElementById('dateFrom').value=window._minDate||'';
+      document.getElementById('dateTo').value=window._maxDate||'';
       setSelectValue('locationSel', next);
       rebuildCodeSelects(next);
       applyFilters();
@@ -386,7 +394,30 @@ function render() {
   renderBars('causeBars', causeData, 'var(--accent4)');
 
   // Donut by location — แสดงจาก DATA ทั้งหมด (filter แค่วันที่) slice ไม่หาย
-  const PALETTE=['#f5a623','#4fc3f7','#81c784','#ef5350','#a78bfa','#4dd0e1','#ffb74d','#f06292','#9ccc65','#64b5f6','#ba68c8'];
+  // 12 แม่สีที่ต่างกันชัดเจน (hue step 30°)
+  const PALETTE12 = [
+    '#FF3B30', // แดง
+    '#FF6B00', // ส้มเข้ม
+    '#FF9500', // ส้ม
+    '#FFCC00', // เหลือง
+    '#34C759', // เขียว
+    '#00C7BE', // เขียวฟ้า
+    '#32ADE6', // ฟ้า
+    '#007AFF', // น้ำเงิน
+    '#5856D6', // ม่วง
+    '#AF52DE', // ม่วงชมพู
+    '#FF2D55', // ชมพูแดง
+    '#A2845E', // น้ำตาล
+  ];
+  // map สีตาม location name แบบถาวร — สีไม่เปลี่ยนแม้ filter เปลี่ยน
+  if(!window._locColorMap) window._locColorMap={};
+  let _paletteIdx = Object.keys(window._locColorMap).length;
+  function getLocColor(loc) {
+    if(!window._locColorMap[loc]) {
+      window._locColorMap[loc] = PALETTE12[_paletteIdx++ % PALETTE12.length];
+    }
+    return window._locColorMap[loc];
+  }
   const fromD=document.getElementById('dateFrom').value;
   const toD  =document.getElementById('dateTo').value;
   const activeLoc=document.getElementById('locationSel').value;
@@ -399,8 +430,8 @@ function render() {
   const sortedLocs=Object.entries(locFreqAll).sort((a,b)=>b[1]-a[1]);
   const cvs=document.getElementById('donutChart');
   const ctx=cvs.getContext('2d');
-  const donutData=sortedLocs.map(([loc,cnt],i)=>({
-    v:cnt, c:PALETTE[i%PALETTE.length],
+  const donutData=sortedLocs.map(([loc,cnt])=>({
+    v:cnt, c:getLocColor(loc),
     label:loc.replace(/\s*\([A-Z]+\)$/,''),
     locValue:loc
   }));
