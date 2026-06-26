@@ -369,7 +369,7 @@ function drawDonut(ctx, data) {
   ctx.font='bold 18px Sarabun, sans-serif';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  ctx.fillText(total, cx, cy-8);
+  ctx.fillText(total.toLocaleString('th-TH'), cx, cy-8);
   ctx.font='11px Sarabun, sans-serif';
   ctx.fillStyle='#8b90a8';
   ctx.fillText('ครั้ง', cx, cy+12);
@@ -432,7 +432,7 @@ function render() {
   const f=filtered;
 
   // KPIs
-  document.getElementById('kpiTotal').textContent=f.length;
+  document.getElementById('kpiTotal').textContent=fmt(f.length);
   const totalOut=f.reduce((s,r)=>s+(r['ระยะเวลาดับ_นาที']||0),0);
   const avgOut=f.length?Math.round(totalOut/f.length):0;
   document.getElementById('kpiAvgOut').textContent=avgOut;
