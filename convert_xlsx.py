@@ -1,12 +1,13 @@
 """
 convert_xlsx.py — แปลง event_outage_data.xlsx → event_outage_data.csv
-รองรับ:
-  - หลาย sheet ในไฟล์เดียว (เช่น แยกเป็นรายปี)
-  - ต่อข้อมูลเข้ากับ CSV เก่า (event_outage_data.csv) อัตโนมัติ
-  - กรองข้อมูลซ้ำด้วย (วันที่ + เวลาเริ่ม + สถานที่ + รหัสอุปกรณ์)
-  - เรียงตาม date_iso แล้วนับ ลำดับ ใหม่ตั้งแต่ 1
+โครงสร้าง Excel:
+  - 1 seq = 1 วัน (merged หลาย row)
+  - แต่ละวันมีหลายเหตุการณ์ = sub-rows ที่มี col[8]=สถานที่
+  - บาง row col[4]=เวลาเริ่มเป็น None → คำนวณย้อนจาก เวลาสิ้นสุด - ระยะเวลา
+  - เหตุการณ์จริง = มีสถานที่ (col[8]) เป็นเงื่อนไขหลัก
 """
-import csv, os
+import csv, os, re
+from datetime import datetime, timedelta
 from openpyxl import load_workbook
 
 THAI_MONTHS = {
@@ -28,8 +29,29 @@ CSV_PATH  = 'event_outage_data.csv'
 XLSX_PATH = 'event_outage_data.xlsx'
 
 # ── helpers ──────────────────────────────────────────────────────
+def td(s): return str(s).translate(THAI_DIGITS)
+
+def cv(v):
+    if v is None: return ''
+    if hasattr(v, 'strftime'): return v.strftime('%H:%M')
+    s = td(str(v).strip())
+    return '' if s in ('None','nan','-') else s
+
+def to_int(v, d=0):
+    if v is None: return d
+    if hasattr(v, 'strftime'): return d
+    try: return max(0, int(float(td(str(v)).strip())))
+    except: return d
+
+def to_int_signed(v, d=0):
+    """รองรับค่าติดลบ (เช่น ระยะเวลาข้ามเที่ยงคืน)"""
+    if v is None: return d
+    if hasattr(v, 'strftime'): return d
+    try: return int(float(td(str(v)).strip()))
+    except: return d
+
 def parse_date(s):
-    s = str(s).strip().translate(THAI_DIGITS)
+    s = td(str(s).strip())
     for th, num in THAI_MONTHS.items():
         s = s.replace(th, num)
     parts = s.split()
@@ -37,93 +59,130 @@ def parse_date(s):
         d, m, y = parts
         try: return f'{int(y)-543}-{m}-{int(d):02d}'
         except: pass
-    # รองรับ ISO ที่ถูกต้องอยู่แล้ว
-    import re
     if re.match(r'^\d{4}-\d{2}-\d{2}$', s): return s
     return ''
 
-def cell(v):
-    if v is None: return ''
-    s = str(v).strip().translate(THAI_DIGITS)
-    return '' if s in ('None', 'nan', '-') else s
+def calc_start_time(time_end_str, dur_min):
+    """คำนวณเวลาเริ่มย้อนกลับจาก เวลาสิ้นสุด - ระยะเวลา(นาที)"""
+    if not time_end_str or dur_min <= 0: return ''
+    try:
+        m = re.match(r'(\d{1,2}):(\d{2})', time_end_str)
+        if not m: return ''
+        end_dt = datetime(2000,1,1, int(m.group(1)), int(m.group(2)))
+        start_dt = end_dt - timedelta(minutes=dur_min)
+        return start_dt.strftime('%H:%M')
+    except: return ''
 
-def to_int(v, d=0):
-    try: return max(0, int(float(str(v)))) if str(v).strip() not in ('', 'None', 'nan') else d
-    except: return d
+def dedup_key(r):
+    return (str(r[20]), str(r[2]), str(r[5]), str(r[6]))
 
-def dedup_key(row_list):
-    """key สำหรับตรวจซ้ำ: วันที่ + เวลาเริ่ม + สถานที่ + รหัสอุปกรณ์"""
-    return (str(row_list[1]), str(row_list[2]), str(row_list[5]), str(row_list[6]))
-
-# ── 1. โหลดข้อมูลเก่าจาก CSV (ถ้ามี) ────────────────────────────
+# ── 1. โหลด CSV เก่า ─────────────────────────────────────────────
 existing = []
 if os.path.exists(CSV_PATH):
     with open(CSV_PATH, newline='', encoding='utf-8-sig') as f:
         reader = csv.reader(f)
-        headers_old = next(reader, None)
+        next(reader, None)
         for row in reader:
             if row: existing.append(row)
-    print(f'📂 โหลดข้อมูลเก่า: {len(existing)} records จาก {CSV_PATH}')
+    print(f'📂 โหลดข้อมูลเก่า: {len(existing)} records')
 else:
     print(f'📂 ไม่พบ {CSV_PATH} — สร้างใหม่')
 
 existing_keys = {dedup_key(r) for r in existing}
 
-# ── 2. อ่าน xlsx ทุก sheet ───────────────────────────────────────
+# ── 2. อ่าน xlsx ─────────────────────────────────────────────────
 wb = load_workbook(XLSX_PATH, data_only=True)
 new_rows = []
 
 for ws in wb.worksheets:
-    sheet_count = 0
-    for row in ws.iter_rows(min_row=9, values_only=True):
-        v = row[1] if len(row) > 1 else None
-        try:
-            seq = int(float(str(v)))
-            if seq <= 0: continue
-        except: continue
+    sheet_new      = 0
+    sheet_dup      = 0
+    sheet_calc     = 0  # นับ rows ที่คำนวณเวลาเริ่มย้อนกลับ
 
-        date_str = cell(row[2])
+    # carry-forward values
+    last_date_raw = ''
+    last_weather  = ''
+    last_cause    = ''
+    last_channel  = ''
+    last_recv     = ''
+    last_depart   = ''
+    last_finish   = ''
+    last_fix      = 0
+    last_person   = ''
+    last_vehicle  = ''
+
+    for row in ws.iter_rows(min_row=9, values_only=True):
+        if len(row) < 10: continue
+
+        # carry-forward วันที่
+        if row[2] is not None: last_date_raw = cv(row[2])
+
+        # carry-forward ค่า merged
+        if cv(row[11]): last_weather = cv(row[11])
+        if cv(row[12]): last_cause   = cv(row[12])
+        if cv(row[14]): last_channel = cv(row[14])
+        if cv(row[15]): last_recv    = cv(row[15])
+        if cv(row[17]): last_depart  = cv(row[17])
+        if cv(row[18]): last_finish  = cv(row[18])
+        if row[19] is not None: last_fix = to_int(row[19])
+        if cv(row[20]): last_person  = cv(row[20]).replace('\n',' | ')
+        if cv(row[21]): last_vehicle = cv(row[21])
+
+        # เงื่อนไขหลัก: ต้องมีสถานที่
+        loc = cv(row[8])
+        if not loc: continue
+
+        # เวลาเริ่ม: ใช้ col[4] ถ้ามี หรือคำนวณย้อนกลับ
+        time_start = cv(row[4])
+        time_end   = cv(row[6])
+        dur        = to_int_signed(row[7])
+
+        if not time_start:
+            time_start = calc_start_time(time_end, dur)
+            if time_start: sheet_calc += 1
+
+        date_iso = parse_date(last_date_raw)
+
         r = [
-            seq,
-            date_str,
-            cell(row[4]),                              # เวลาเริ่ม
-            cell(row[6]),                              # เวลาสิ้นสุด
-            to_int(row[7]),                            # ระยะเวลาดับ
-            cell(row[8]),                              # สถานที่
-            cell(row[9]),                              # รหัสอุปกรณ์
-            to_int(row[10]),                           # จำนวนผชฟ
-            cell(row[11]),                             # สภาพอากาศ
-            cell(row[12]),                             # สาเหตุ
-            cell(row[14]),                             # ช่องทางการแจ้ง
-            cell(row[15]),                             # เวลารับแจ้ง
-            cell(row[17]),                             # เวลาออกปฏิบัติงาน
-            cell(row[18]),                             # เวลาเสร็จงาน
-            to_int(row[19]),                           # เวลาแก้ไข
-            cell(row[20]).replace('\n', ' | '),        # ผู้ปฏิบัติงาน
-            cell(row[21]),                             # ยานพาหนะ
-            cell(row[24]),                             # อุปกรณ์_รายการ
-            cell(row[25]),                             # อุปกรณ์_จำนวน
-            cell(row[29]) if len(row) > 29 else '',   # หมายเหตุ
-            parse_date(date_str),
+            0,                  # ลำดับ (นับใหม่ทีหลัง)
+            last_date_raw,      # วันที่
+            time_start,         # เวลาเริ่ม
+            time_end,           # เวลาสิ้นสุด
+            max(0, dur),        # ระยะเวลาดับ_นาที
+            loc,                # สถานที่
+            cv(row[9]),         # รหัสอุปกรณ์
+            to_int(row[10]),    # จำนวนผชฟ_กระทบ
+            last_weather,       # สภาพอากาศ
+            last_cause,         # สาเหตุ
+            last_channel,       # ช่องทางการแจ้ง
+            last_recv,          # เวลารับแจ้ง
+            last_depart,        # เวลาออกปฏิบัติงาน
+            last_finish,        # เวลาเสร็จงาน
+            last_fix,           # เวลาแก้ไข_นาที
+            last_person,        # ผู้ปฏิบัติงาน
+            last_vehicle,       # ยานพาหนะ
+            cv(row[24]) if len(row) > 24 else '',
+            cv(row[25]) if len(row) > 25 else '',
+            cv(row[29]) if len(row) > 29 else '',
+            date_iso,
         ]
 
         key = dedup_key(r)
-        if key not in existing_keys:
-            new_rows.append(r)
-            existing_keys.add(key)
-            sheet_count += 1
+        if key in existing_keys:
+            sheet_dup += 1
+            continue
 
-    print(f'  📄 Sheet "{ws.title}": พบใหม่ {sheet_count} records')
+        new_rows.append(r)
+        existing_keys.add(key)
+        sheet_new += 1
 
-print(f'➕ ข้อมูลใหม่ที่จะเพิ่ม: {len(new_rows)} records')
+    print(f'  📄 Sheet "{ws.title}": ใหม่ {sheet_new} | ซ้ำ {sheet_dup} | คำนวณเวลาเริ่มย้อนกลับ {sheet_calc} rows')
+
+print(f'➕ ข้อมูลใหม่: {len(new_rows)} records')
 
 # ── 3. รวม + เรียง + นับลำดับใหม่ ────────────────────────────────
 all_rows = existing + new_rows
-
-# เรียงตาม date_iso (col index 20) แล้วตาม เวลาเริ่ม (col index 2)
 all_rows.sort(key=lambda r: (str(r[20]), str(r[2])))
-
-# นับลำดับใหม่ตั้งแต่ 1
 for i, r in enumerate(all_rows, 1):
     r[0] = i
 
@@ -133,6 +192,7 @@ with open(CSV_PATH, 'w', newline='', encoding='utf-8-sig') as f:
     w.writerow(HEADERS)
     w.writerows(all_rows)
 
-print(f'✅ บันทึกสำเร็จ: {len(all_rows)} records รวม → {CSV_PATH}')
+print(f'\n✅ บันทึกสำเร็จ: {len(all_rows)} records → {CSV_PATH}')
 if all_rows:
-    print(f'   ช่วงข้อมูล: {all_rows[0][20]} ถึง {all_rows[-1][20]}')
+    dates = [r[20] for r in all_rows if r[20]]
+    if dates: print(f'   ช่วงข้อมูล: {min(dates)} ถึง {max(dates)}')
