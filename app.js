@@ -364,11 +364,18 @@ function render() {
   })();
   renderBars('causeBars', causeData, 'var(--accent4)');
 
-  // Donut by location
+  // Donut by location — แสดงจาก DATA ทั้งหมด (filter แค่วันที่) slice ไม่หาย
   const PALETTE=['#f5a623','#4fc3f7','#81c784','#ef5350','#a78bfa','#4dd0e1','#ffb74d','#f06292','#9ccc65','#64b5f6','#ba68c8'];
-  const locFreq={};
-  f.forEach(r=>{ const loc=(r['สถานที่']||'').trim(); if(loc) locFreq[loc]=(locFreq[loc]||0)+1; });
-  const sortedLocs=Object.entries(locFreq).sort((a,b)=>b[1]-a[1]);
+  const fromD=document.getElementById('dateFrom').value;
+  const toD  =document.getElementById('dateTo').value;
+  const activeLoc=document.getElementById('locationSel').value;
+  const locFreqAll={};
+  DATA.filter(r=>{
+    if(fromD&&r.date_iso&&r.date_iso<fromD) return false;
+    if(toD  &&r.date_iso&&r.date_iso>toD)   return false;
+    return true;
+  }).forEach(r=>{ const loc=(r['สถานที่']||'').trim(); if(loc) locFreqAll[loc]=(locFreqAll[loc]||0)+1; });
+  const sortedLocs=Object.entries(locFreqAll).sort((a,b)=>b[1]-a[1]);
   const cvs=document.getElementById('donutChart');
   const ctx=cvs.getContext('2d');
   const donutData=sortedLocs.map(([loc,cnt],i)=>({
@@ -378,11 +385,13 @@ function render() {
   }));
   drawDonut(ctx, donutData);
   setupDonutClick(cvs);
-  document.getElementById('donutLegend').innerHTML=donutData.map(d=>`
-    <span onclick="clickBarFilter('locationSel','${d.locValue.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
-      <span style="width:8px;height:8px;border-radius:50%;background:${d.c};flex-shrink:0"></span>
-      <span style="color:var(--muted)">${d.label}: <b style="color:var(--text)">${d.v}</b></span>
-    </span>`).join('');
+  document.getElementById('donutLegend').innerHTML=donutData.map(d=>{
+    const isActive=d.locValue===activeLoc;
+    return `<span onclick="clickBarFilter('locationSel','${d.locValue.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 6px;border-radius:4px;transition:all .15s;${isActive?'background:rgba(255,255,255,0.08);outline:1px solid '+d.c+';':''}" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='${isActive?'rgba(255,255,255,0.08)':'transparent'}'">
+      <span style="width:8px;height:8px;border-radius:50%;background:${d.c};flex-shrink:0;${isActive?'box-shadow:0 0 5px '+d.c:''}"></span>
+      <span style="color:${isActive?'#fff':'var(--muted)'};">${d.label}: <b style="color:${isActive?d.c:'var(--text)'}">${d.v}</b></span>
+    </span>`;
+  }).join('');
 
   // Monthly bar — คำนวณจาก data ที่กรองด้วย สถานที่+รหัส+dateFrom/To เท่านั้น (ไม่ติด selectedMonth)
   // เพื่อให้เห็นทุกเดือนในช่วงที่เลือก และ count ตรงกับ filtered จริงๆ
