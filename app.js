@@ -59,6 +59,19 @@ function isTransCode(code) { return !!(code && !isEquipCode(code) && !isMeterCod
 const DATA = [];
 let filtered = [];
 let selectedMonth = null;
+let _sortCol = null, _sortAsc = true;
+
+function sortTable(col) {
+  if(_sortCol===col) _sortAsc=!_sortAsc; else { _sortCol=col; _sortAsc=true; }
+  const num = ['ระยะเวลาดับ_นาที','จำนวนผชฟ_กระทบ','เวลาแก้ไข_นาที','ลำดับ'];
+  filtered.sort((a,b)=>{
+    let av=a[col]??'', bv=b[col]??'';
+    if(col==='date_iso'){ av=a.date_iso+(a['เวลาเริ่ม']||''); bv=b.date_iso+(b['เวลาเริ่ม']||''); }
+    if(num.includes(col)){ av=Number(av)||0; bv=Number(bv)||0; return _sortAsc?av-bv:bv-av; }
+    return _sortAsc?String(av).localeCompare(String(bv),'th'):String(bv).localeCompare(String(av),'th');
+  });
+  if(window._renderTable) { window._tablePage=0; window._renderTable(0); }
+}
 
 document.body.insertAdjacentHTML('beforeend',`
   <div id="loading" style="position:fixed;inset:0;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px">
@@ -98,30 +111,36 @@ function tryFetch(paths) {
 
 tryFetch(csvPaths);
 
+// ── setSelectValue: ตั้งค่า <select> พร้อม sync searchable dropdown label ──
+function setSelectValue(id, value) {
+  const sel = document.getElementById(id);
+  sel.value = value; // กระตุ้น setter patch ของ searchable dropdown (syncDisplay)
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 // ── Click-to-filter from bar charts ──
 function clickBarFilter(selectId, value) {
   if(selectId === 'locationSel') {
     const cur = document.getElementById('locationSel').value;
     const next = cur === value ? 'all' : value;  // toggle
-    document.getElementById('locationSel').value = next;
+    setSelectValue('locationSel', next);
     rebuildCodeSelects(next);
   } else {
     const sel = document.getElementById(selectId);
-    sel.value = sel.value === value ? '' : value;  // toggle
+    setSelectValue(selectId, sel.value === value ? '' : value);  // toggle
   }
   applyFilters();
 }
 
 function resetFilters() {
-  // ปิด listener ชั่วคราวด้วย flag ป้องกัน onchange ของ date input trigger applyFilters ซ้อน
   window._resetting = true;
   selectedMonth = null;
-  document.getElementById('locationSel').value = 'all';
+  setSelectValue('locationSel', 'all');
   document.getElementById('dateFrom').value = window._minDate || '';
   document.getElementById('dateTo').value = window._maxDate || '';
-  document.getElementById('equipSel').value = '';
-  document.getElementById('transSel').value = '';
-  document.getElementById('meterSel').value = '';
+  setSelectValue('equipSel', '');
+  setSelectValue('transSel', '');
+  setSelectValue('meterSel', '');
   rebuildCodeSelects('all');
   window._resetting = false;
   applyFilters();
@@ -311,8 +330,10 @@ function setupDonutClick(canvas) {
     if(a<-Math.PI/2) a+=Math.PI*2;
     const slice=slices.find(s=>a>=s.start&&a<s.end);
     if(slice&&slice.loc){
-      document.getElementById('locationSel').value=slice.loc;
-      rebuildCodeSelects(slice.loc);
+      const sel=document.getElementById('locationSel');
+      const next=sel.value===slice.loc?'all':slice.loc;  // toggle
+      setSelectValue('locationSel', next);
+      rebuildCodeSelects(next);
       applyFilters();
     }
   });
@@ -472,30 +493,64 @@ function render() {
   // Weather bars
   renderBars('weatherBars', topN(f,'สภาพอากาศ',8), 'var(--accent2)');
 
-  // Table
-  document.getElementById('tableCount').textContent=`แสดง ${Math.min(f.length,200)} จาก ${f.length} รายการ`;
-  const tbody=document.getElementById('tableBody');
-  tbody.innerHTML=f.slice(0,200).map((r,i)=>{
-    const locFull=(r['สถานที่']||'').trim();
-    const shortCode=locFull.match(/^(กฟ[จส]\.[^\s(]+)/)?.[1]||locFull;
-    const sizeTag=locFull.match(/\(([A-Z]+)\)/)?.[1]||'';
-    const badgeColor=sizeTag==='L'?'var(--gfj)':sizeTag==='S'?'#81c784':'var(--gfs)';
-    const dur=r['ระยะเวลาดับ_นาที']||0;
-    const durColor=dur>120?'var(--accent4)':dur>60?'var(--accent)':'var(--text)';
-    const fix=r['เวลาแก้ไข_นาที']||0;
-    return `<tr>
-      <td style="color:var(--muted)">${r['ลำดับ']}</td>
-      <td>${r['วันที่']}</td>
-      <td>${r['เวลาเริ่ม']}${r['เวลาสิ้นสุด']?' – '+r['เวลาสิ้นสุด']:''}</td>
-      <td style="color:${durColor};font-weight:600">${dur>0?dur:'—'}</td>
-      <td><span class="badge" style="background:${badgeColor}22;color:${badgeColor}">${shortCode}</span></td>
-      <td style="font-family:monospace;font-size:11px">${r['รหัสอุปกรณ์']||'—'}</td>
-      <td style="text-align:right">${fmt(r['จำนวนผชฟ_กระทบ'])}</td>
-      <td>${r['สาเหตุ']||'—'}</td>
-      <td>${r['สภาพอากาศ']||'—'}</td>
-      <td style="text-align:right">${fix>0?fix:'—'}</td>
-    </tr>`;
-  }).join('');
+  // Table + pagination + export
+  const PAGE_SIZE = 200;
+  window._tableData = f;
+  window._tablePage = 0;
+  const btnStyle = `background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:'Sarabun',sans-serif;font-size:11px;cursor:pointer`;
+
+  function renderTable(page) {
+    const start = page * PAGE_SIZE;
+    const slice = f.slice(start, start + PAGE_SIZE);
+    const totalPages = Math.ceil(f.length / PAGE_SIZE);
+    const pageNav = f.length > PAGE_SIZE
+      ? `&nbsp;&nbsp;<button onclick="prevPage()" style="${btnStyle}" ${page===0?'disabled':''}>◀</button>&nbsp;หน้า ${page+1}/${totalPages}&nbsp;<button onclick="nextPage()" style="${btnStyle}" ${start+PAGE_SIZE>=f.length?'disabled':''}>▶</button>`
+      : '';
+    document.getElementById('tableCount').innerHTML =
+      `แสดง ${f.length?start+1:0}–${Math.min(start+slice.length,f.length)} จาก ${f.length} รายการ` +
+      `&nbsp;&nbsp;<button onclick="exportCSV()" style="background:var(--accent3);color:#000;border:none;border-radius:5px;padding:3px 10px;font-family:'Sarabun',sans-serif;font-size:11px;font-weight:700;cursor:pointer">⬇ ส่งออก CSV</button>` +
+      pageNav;
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = slice.map(r => {
+      const locFull=(r['สถานที่']||'').trim();
+      const shortCode=locFull.match(/^(กฟ[จส]\.[^\s(]+)/)?.[1]||locFull;
+      const sizeTag=locFull.match(/\(([A-Z]+)\)/)?.[1]||'';
+      const badgeColor=sizeTag==='L'?'var(--gfj)':sizeTag==='S'?'#81c784':'var(--gfs)';
+      const dur=r['ระยะเวลาดับ_นาที']||0;
+      const durColor=dur>120?'var(--accent4)':dur>60?'var(--accent)':'var(--text)';
+      const fix=r['เวลาแก้ไข_นาที']||0;
+      return `<tr>
+        <td style="color:var(--muted)">${r['ลำดับ']}</td>
+        <td>${r['วันที่']}</td>
+        <td>${r['เวลาเริ่ม']}${r['เวลาสิ้นสุด']?' – '+r['เวลาสิ้นสุด']:''}</td>
+        <td style="color:${durColor};font-weight:600">${dur>0?dur:'—'}</td>
+        <td><span class="badge" style="background:${badgeColor}22;color:${badgeColor}">${shortCode}</span></td>
+        <td style="font-family:monospace;font-size:11px">${r['รหัสอุปกรณ์']||'—'}</td>
+        <td style="text-align:right">${fmt(r['จำนวนผชฟ_กระทบ'])}</td>
+        <td>${r['สาเหตุ']||'—'}</td>
+        <td>${r['สภาพอากาศ']||'—'}</td>
+        <td style="text-align:right">${fix>0?fix:'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  window._renderTable = renderTable;
+  renderTable(0);
+}
+
+window.prevPage = () => { if(window._tablePage>0){window._tablePage--;window._renderTable(window._tablePage);} };
+window.nextPage = () => { const max=Math.ceil(window._tableData.length/200)-1; if(window._tablePage<max){window._tablePage++;window._renderTable(window._tablePage);} };
+
+// ── Export CSV (filtered) ──
+function exportCSV() {
+  const headers=['ลำดับ','วันที่','เวลาเริ่ม','เวลาสิ้นสุด','ระยะเวลาดับ_นาที','สถานที่','รหัสอุปกรณ์','จำนวนผชฟ_กระทบ','สภาพอากาศ','สาเหตุ','ช่องทางการแจ้ง','เวลารับแจ้ง','เวลาออกปฏิบัติงาน','เวลาเสร็จงาน','เวลาแก้ไข_นาที','ผู้ปฏิบัติงาน'];
+  const esc=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const rows=[headers.join(','),...filtered.map(r=>headers.map(h=>esc(r[h])).join(','))];
+  const blob=new Blob(['\uFEFF'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`outage_export_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
 }
 
 // ── Init ──

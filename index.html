@@ -107,22 +107,22 @@
 <div class="main">
   <!-- KPI -->
   <div class="kpi-row">
-    <div class="kpi k1">
+    <div class="kpi k1" title="จำนวนเหตุการณ์ทั้งหมดที่ตรงกับเงื่อนไขฟิลเตอร์ปัจจุบัน">
       <div class="kpi-label">เหตุการณ์ทั้งหมด</div>
       <div class="kpi-val" id="kpiTotal">—</div>
       <div class="kpi-sub">รายการที่กรอง</div>
     </div>
-    <div class="kpi k2">
+    <div class="kpi k2" title="ค่าเฉลี่ยระยะเวลาไฟฟ้าดับต่อครั้ง (นาที)">
       <div class="kpi-label">เฉลี่ยระยะเวลาดับ</div>
       <div class="kpi-val" id="kpiAvgOut">—</div>
       <div class="kpi-sub">นาที/ครั้ง</div>
     </div>
-    <div class="kpi k3">
+    <div class="kpi k3" title="ผลรวมผู้ใช้ไฟฟ้าที่ได้รับผลกระทบทั้งหมด">
       <div class="kpi-label">ผู้ใช้กระทบรวม</div>
       <div class="kpi-val" id="kpiUsers">—</div>
       <div class="kpi-sub">ราย</div>
     </div>
-    <div class="kpi k4">
+    <div class="kpi k4" title="ค่าเฉลี่ยเวลาแก้ไขเหตุการณ์ต่อครั้ง (นาที)">
       <div class="kpi-label">เฉลี่ยเวลาแก้ไข</div>
       <div class="kpi-val" id="kpiAvgFix">—</div>
       <div class="kpi-sub">นาที/ครั้ง</div>
@@ -175,16 +175,16 @@
       <table>
         <thead>
           <tr>
-            <th>#</th>
-            <th>วันที่</th>
+            <th onclick="sortTable('ลำดับ')" style="cursor:pointer" title="เรียงลำดับ"># ⇅</th>
+            <th onclick="sortTable('date_iso')" style="cursor:pointer" title="เรียงตามวันที่">วันที่ ⇅</th>
             <th>เวลา</th>
-            <th>ดับ (นาที)</th>
-            <th>สาขา</th>
+            <th onclick="sortTable('ระยะเวลาดับ_นาที')" style="cursor:pointer" title="เรียงตามระยะเวลา">ดับ (นาที) ⇅</th>
+            <th onclick="sortTable('สถานที่')" style="cursor:pointer" title="เรียงตามสาขา">สาขา ⇅</th>
             <th>รหัสอุปกรณ์</th>
-            <th>ผู้กระทบ</th>
-            <th>สาเหตุ</th>
+            <th onclick="sortTable('จำนวนผชฟ_กระทบ')" style="cursor:pointer" title="เรียงตามผู้กระทบ">ผู้กระทบ ⇅</th>
+            <th onclick="sortTable('สาเหตุ')" style="cursor:pointer" title="เรียงตามสาเหตุ">สาเหตุ ⇅</th>
             <th>สภาพอากาศ</th>
-            <th>แก้ไข (นาที)</th>
+            <th onclick="sortTable('เวลาแก้ไข_นาที')" style="cursor:pointer" title="เรียงตามเวลาแก้ไข">แก้ไข (นาที) ⇅</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -280,6 +280,9 @@
 </style>
 
 <script>
+// ── capture prototype descriptor ครั้งเดียว ก่อน initSearchableDropdown ──
+const _origSelectValueDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+
 // ── Searchable Dropdown Engine ──
 // ใช้ร่วมกับ <select> ที่ซ่อนอยู่ข้างใน — app.js อ่าน select.value ได้เหมือนเดิม
 
@@ -308,7 +311,10 @@ function initSearchableDropdown(wrapId) {
            data-val="${o.value.replace(/"/g,'&quot;')}">${o.text}</div>`).join('');
     list.querySelectorAll('.sd-item:not(.no-result)').forEach(item => {
       item.addEventListener('click', () => {
-        sel.value = item.dataset.val;
+        // toggle: คลิกซ้ำ active item → reset กลับ default
+        const isReset = item.dataset.val === sel.value && item.dataset.val !== '' && item.dataset.val !== 'all';
+        const newVal  = isReset ? (sel.options[0]?.value ?? '') : item.dataset.val;
+        sel.value = newVal;
         sel.dispatchEvent(new Event('change', { bubbles: true }));
         syncDisplay();
         close();
@@ -319,14 +325,12 @@ function initSearchableDropdown(wrapId) {
   function syncDisplay() {
     const cur = Array.from(sel.options).find(o => o.value === sel.value);
     if (cur) {
-      // ตัดส่วน (XX) จากท้ายชื่อออกเพื่อความกระชับ
       label.textContent = cur.textContent.trim().replace(/\s*\(\d+\)$/, '') || 'ทั้งหมด';
       label.classList.toggle('selected', sel.value !== '' && sel.value !== 'all');
     }
   }
 
   function open() {
-    // ปิด dropdown อื่นก่อน
     document.querySelectorAll('.sd-wrap.open').forEach(w => { if(w!==wrap) w.classList.remove('open'); });
     wrap.classList.add('open');
     search.value = '';
@@ -350,31 +354,24 @@ function initSearchableDropdown(wrapId) {
     }
   });
 
-  // ปิดเมื่อคลิกนอก
   document.addEventListener('click', e => {
     if(!wrap.contains(e.target)) close();
   }, true);
 
-  // sync เมื่อ app.js เปลี่ยน sel.value โดยตรง (เช่น resetFilters / clickBarFilter)
-  // ใช้ MutationObserver + custom dispatchEvent แทน เพราะ 'change' จาก JS ไม่ bubble ผ่าน hidden select
-  const origDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
-  // patch เฉพาะ select นี้ด้วย setter wrapper
+  // patch value setter บน instance นี้เท่านั้น — ใช้ _origSelectValueDescriptor ที่ capture ไว้ก่อน
   let _val = sel.value;
   Object.defineProperty(sel, 'value', {
     get() { return _val; },
     set(v) {
       _val = v;
-      origDescriptor.set.call(sel, v);
+      _origSelectValueDescriptor.set.call(sel, v);
       syncDisplay();
     },
     configurable: true
   });
 
-  // sync เมื่อ innerHTML ของ select เปลี่ยน (rebuildCodeSelects)
   new MutationObserver(() => {
-    // หลัง rebuild sel.value อาจถูก reset → sync label
     syncDisplay();
-    // re-render list ถ้าเปิดอยู่
     if(wrap.classList.contains('open')) renderList(search.value);
   }).observe(sel, { childList: true });
 
@@ -382,24 +379,19 @@ function initSearchableDropdown(wrapId) {
   return { syncDisplay, renderList };
 }
 
-// เริ่มต้นหลัง DOM ready — รอ app.js init() เสร็จก่อน (DATA โหลดแล้ว)
-// ใช้ MutationObserver จับว่า #loading ถูกลบ (= init() เสร็จ)
+// รอให้ app.js เรียก init() เสร็จ (loading div ถูกลบ) แล้วค่อย setup
 function setupAllDropdowns() {
   ['sd-locationSel','sd-equipSel','sd-transSel','sd-meterSel'].forEach(initSearchableDropdown);
 }
 
-const loadingEl = document.getElementById('loading') || document.body;
-if(!document.getElementById('loading')) {
-  setupAllDropdowns();
-} else {
-  new MutationObserver((_, obs) => {
-    if(!document.getElementById('loading')) {
-      obs.disconnect();
-      // รอ 1 tick ให้ init() เพิ่ม options ก่อน
-      setTimeout(setupAllDropdowns, 50);
-    }
-  }).observe(document.body, { childList: true });
-}
+// init() ใน app.js ลบ #loading แล้วเรียก init() → options พร้อมแล้ว → setup
+const _sdObserver = new MutationObserver((_, obs) => {
+  if(!document.getElementById('loading')) {
+    obs.disconnect();
+    setTimeout(setupAllDropdowns, 0); // รอ 1 tick ให้ rebuildCodeSelects เสร็จ
+  }
+});
+_sdObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 
 </body>
