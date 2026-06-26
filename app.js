@@ -61,6 +61,77 @@ let filtered = [];
 let selectedMonth = null;
 let _sortCol = null, _sortAsc = true;
 
+// ── Filter History Stack ──
+// แต่ละ entry = snapshot ของ state ก่อนกด
+// กดซ้ำตัวเดิม = pop กลับไป snapshot ก่อนหน้า
+const _filterStack = [];
+
+function _snapState() {
+  return {
+    loc:   document.getElementById('locationSel').value,
+    month: selectedMonth,
+    from:  document.getElementById('dateFrom').value,
+    to:    document.getElementById('dateTo').value,
+    eq:    document.getElementById('equipSel').value,
+    tr:    document.getElementById('transSel').value,
+    mt:    document.getElementById('meterSel').value,
+  };
+}
+
+function _restoreState(s) {
+  window._resetting = true;
+  selectedMonth = s.month;
+  document.getElementById('dateFrom').value = s.from;
+  document.getElementById('dateTo').value   = s.to;
+  setSelectValue('locationSel', s.loc);
+  rebuildCodeSelects(s.loc, s.eq, s.tr, s.mt);
+  setSelectValue('equipSel', s.eq);
+  setSelectValue('transSel', s.tr);
+  setSelectValue('meterSel', s.mt);
+  window._resetting = false;
+  applyFilters();
+}
+
+// ตรวจว่า state ปัจจุบัน active ใน dimension นี้อยู่หรือเปล่า
+function _isActive(type, value) {
+  if(type==='loc')   return document.getElementById('locationSel').value === value;
+  if(type==='month') return selectedMonth === value;
+  if(type==='eq')    return document.getElementById('equipSel').value === value;
+  if(type==='tr')    return document.getElementById('transSel').value === value;
+  if(type==='mt')    return document.getElementById('meterSel').value === value;
+  return false;
+}
+
+// กด filter → push snapshot แล้ว set / กดซ้ำ → pop กลับ
+function pushFilter(type, value, applyFn) {
+  if(_isActive(type, value)) {
+    // กดซ้ำ → pop
+    if(_filterStack.length) {
+      const prev = _filterStack.pop();
+      _restoreState(prev);
+    } else {
+      resetFilters();
+    }
+  } else {
+    _filterStack.push(_snapState());
+    applyFn();
+  }
+  _renderBreadcrumb();
+}
+
+function _renderBreadcrumb() {
+  // แสดง breadcrumb indicator เล็กๆ บน filter bar
+  let el = document.getElementById('_filterBreadcrumb');
+  if(!el) {
+    el = document.createElement('div');
+    el.id = '_filterBreadcrumb';
+    el.style.cssText = 'font-size:11px;color:var(--muted);align-self:flex-end;padding-bottom:7px;display:flex;align-items:center;gap:6px;';
+    document.querySelector('.filter-bar').appendChild(el);
+  }
+  if(!_filterStack.length) { el.innerHTML=''; return; }
+  el.innerHTML = `<span style="color:var(--accent3)">⬤</span> ${_filterStack.length} ชั้นฟิลเตอร์ — <span onclick="resetFilters()" style="color:var(--accent4);cursor:pointer;text-decoration:underline">ล้างทั้งหมด</span>`;
+}
+
 function sortTable(col) {
   if(_sortCol===col) _sortAsc=!_sortAsc; else { _sortCol=col; _sortAsc=true; }
   const num = ['ระยะเวลาดับ_นาที','จำนวนผชฟ_กระทบ','เวลาแก้ไข_นาที','ลำดับ'];
@@ -121,38 +192,44 @@ function setSelectValue(id, value) {
 // ── Click-to-filter from bar charts ──
 function clickBarFilter(selectId, value) {
   if(selectId === 'locationSel') {
-    const cur = document.getElementById('locationSel').value;
-    const next = cur === value ? 'all' : value;
-    // เมื่อเปลี่ยน location ให้ reset selectedMonth และคืน date range
-    selectedMonth=null;
-    document.getElementById('dateFrom').value=window._minDate||'';
-    document.getElementById('dateTo').value=window._maxDate||'';
-    setSelectValue('locationSel', next);
-    rebuildCodeSelects(next);
+    pushFilter('loc', value, () => {
+      selectedMonth = null;
+      document.getElementById('dateFrom').value = window._minDate||'';
+      document.getElementById('dateTo').value   = window._maxDate||'';
+      setSelectValue('locationSel', value);
+      rebuildCodeSelects(value);
+      applyFilters();
+    });
   } else {
-    const sel = document.getElementById(selectId);
-    setSelectValue(selectId, sel.value === value ? '' : value);
+    const typeMap = { equipSel:'eq', transSel:'tr', meterSel:'mt' };
+    pushFilter(typeMap[selectId]||selectId, value, () => {
+      setSelectValue(selectId, value);
+      applyFilters();
+    });
   }
-  applyFilters();
 }
 
 function resetFilters() {
+  _filterStack.length = 0; // ล้าง stack
   window._resetting = true;
   selectedMonth = null;
   setSelectValue('locationSel', 'all');
   document.getElementById('dateFrom').value = window._minDate || '';
-  document.getElementById('dateTo').value = window._maxDate || '';
+  document.getElementById('dateTo').value   = window._maxDate || '';
   setSelectValue('equipSel', '');
   setSelectValue('transSel', '');
   setSelectValue('meterSel', '');
   rebuildCodeSelects('all');
   window._resetting = false;
+  _renderBreadcrumb();
   applyFilters();
 }
 
 function filterByMonth(monthKey) {
-  selectedMonth = (selectedMonth === monthKey) ? null : monthKey; // toggle
-  applyFilters();
+  pushFilter('month', monthKey, () => {
+    selectedMonth = monthKey;
+    applyFilters();
+  });
 }
 
 function rebuildCodeSelects(locFilter, keepEq='', keepTr='', keepMt='') {
@@ -334,15 +411,14 @@ function setupDonutClick(canvas) {
     if(a<-Math.PI/2) a+=Math.PI*2;
     const slice=slices.find(s=>a>=s.start&&a<s.end);
     if(slice&&slice.loc){
-      const sel=document.getElementById('locationSel');
-      const next=sel.value===slice.loc?'all':slice.loc;  // toggle
-      // reset selectedMonth เพื่อคืน date range เดิม
-      selectedMonth=null;
-      document.getElementById('dateFrom').value=window._minDate||'';
-      document.getElementById('dateTo').value=window._maxDate||'';
-      setSelectValue('locationSel', next);
-      rebuildCodeSelects(next);
-      applyFilters();
+      pushFilter('loc', slice.loc, () => {
+        selectedMonth=null;
+        document.getElementById('dateFrom').value=window._minDate||'';
+        document.getElementById('dateTo').value=window._maxDate||'';
+        setSelectValue('locationSel', slice.loc);
+        rebuildCodeSelects(slice.loc);
+        applyFilters();
+      });
     }
   });
 }
@@ -394,20 +470,20 @@ function render() {
   renderBars('causeBars', causeData, 'var(--accent4)');
 
   // Donut by location — แสดงจาก DATA ทั้งหมด (filter แค่วันที่) slice ไม่หาย
-  // 12 แม่สีที่ต่างกันชัดเจน (hue step 30°)
+  // 12 สี pastel สบายตา แต่ละ hue ต่างกัน 30°
   const PALETTE12 = [
-    '#FF3B30', // แดง
-    '#FF6B00', // ส้มเข้ม
-    '#FF9500', // ส้ม
-    '#FFCC00', // เหลือง
-    '#34C759', // เขียว
-    '#00C7BE', // เขียวฟ้า
-    '#32ADE6', // ฟ้า
-    '#007AFF', // น้ำเงิน
-    '#5856D6', // ม่วง
-    '#AF52DE', // ม่วงชมพู
-    '#FF2D55', // ชมพูแดง
-    '#A2845E', // น้ำตาล
+    '#FF8A80', // ชมพูแดง pastel
+    '#FFAB76', // ส้ม pastel
+    '#FFD580', // เหลือง pastel
+    '#B5E88A', // เขียวอ่อน pastel
+    '#69D9A0', // มิ้นท์ pastel
+    '#6FD4D4', // เขียวฟ้า pastel
+    '#7EC8E3', // ฟ้าอ่อน pastel
+    '#82AAFF', // น้ำเงิน pastel
+    '#B39DDB', // ม่วง pastel
+    '#CE93D8', // ม่วงชมพู pastel
+    '#F48FB1', // ชมพู pastel
+    '#BCAAA4', // น้ำตาลอ่อน pastel
   ];
   // map สีตาม location name แบบถาวร — สีไม่เปลี่ยนแม้ filter เปลี่ยน
   if(!window._locColorMap) window._locColorMap={};
