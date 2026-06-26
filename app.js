@@ -99,13 +99,15 @@ function tryFetch(paths) {
 tryFetch(csvPaths);
 
 // ── Click-to-filter from bar charts ──
-// selectId = 'equipSel' | 'transSel' | 'meterSel' | 'locationSel'
 function clickBarFilter(selectId, value) {
   if(selectId === 'locationSel') {
-    document.getElementById('locationSel').value = value;
-    rebuildCodeSelects(value);
+    const cur = document.getElementById('locationSel').value;
+    const next = cur === value ? 'all' : value;  // toggle
+    document.getElementById('locationSel').value = next;
+    rebuildCodeSelects(next);
   } else {
-    document.getElementById(selectId).value = value;
+    const sel = document.getElementById(selectId);
+    sel.value = sel.value === value ? '' : value;  // toggle
   }
   applyFilters();
 }
@@ -413,17 +415,50 @@ function render() {
     return {key:k, label:`${MONTHS_TH[parseInt(mm)-1]} ${(+yy+543).toString().slice(-2)}`, v:monthFreq[k], active:k===selectedMonth};
   }));
 
-  // Equipment bars (codes with letters)
-  const equipOnly=f.filter(r=>isEquipCode((r['รหัสอุปกรณ์']||'').trim()));
-  renderBars('equipBars', topN(equipOnly,'รหัสอุปกรณ์',10), 'var(--accent)', 'equipSel');
+  // Equipment/Transformer/Meter bars
+  // ใช้ baseForBars = filter สถานที่+วันที่ แต่ไม่ filter code → bar ไม่หาย
+  const eqNow2 =document.getElementById('equipSel').value;
+  const trNow2 =document.getElementById('transSel').value;
+  const mtNow2 =document.getElementById('meterSel').value;
+  const fromFilter=document.getElementById('dateFrom').value;
+  const toFilter  =document.getElementById('dateTo').value;
+  const locFilter =document.getElementById('locationSel').value;
 
-  // Transformer bars (มี - ไม่มีตัวอักษร)
-  const transOnly=f.filter(r=>isTransCode((r['รหัสอุปกรณ์']||'').trim()));
-  renderBars('transBars', topN(transOnly,'รหัสอุปกรณ์',10), '#a78bfa', 'transSel');
+  const baseForBars=DATA.filter(r=>{
+    if(locFilter!=='all'&&r['สถานที่']!==locFilter) return false;
+    if(fromFilter&&r.date_iso&&r.date_iso<fromFilter) return false;
+    if(toFilter  &&r.date_iso&&r.date_iso>toFilter)   return false;
+    return true;
+  });
 
-  // Meter bars (ตัวเลขล้วน)
-  const meterOnly=f.filter(r=>isMeterCode((r['รหัสอุปกรณ์']||'').trim()));
-  renderBars('meterBars', topN(meterOnly,'รหัสอุปกรณ์',10), '#4dd0e1', 'meterSel');
+  // render bar พร้อม highlight ตัวที่เลือก
+  function renderCodeBars(containerId, data, color, selectId, activeVal) {
+    const el=document.getElementById(containerId);
+    if(!data.length){el.innerHTML='<div style="color:var(--muted);font-size:12px">ไม่มีข้อมูล</div>';return;}
+    const max=data[0][1];
+    el.innerHTML=data.map(([label,cnt])=>{
+      const safeLabel=label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const isActive=activeVal&&label===activeVal;
+      const barColor=isActive?'#fff':color;
+      const bg=isActive?'rgba(255,255,255,0.08)':'';
+      const labelColor=isActive?'#fff':'var(--text)';
+      const ring=isActive?`outline:2px solid ${color};outline-offset:2px;border-radius:4px;`:'';
+      return `<div class="bar-row" style="cursor:pointer;${bg?'background:'+bg+';':''}${ring}" onclick="clickBarFilter('${selectId}','${safeLabel}')">
+        <div class="bar-label" style="color:${labelColor}" title="${label}">${label}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(cnt/max*100).toFixed(1)}%;background:${barColor}"></div></div>
+        <div class="bar-count">${cnt}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const equipOnly=baseForBars.filter(r=>isEquipCode((r['รหัสอุปกรณ์']||'').trim()));
+  renderCodeBars('equipBars', topN(equipOnly,'รหัสอุปกรณ์',10), 'var(--accent)', 'equipSel', eqNow2);
+
+  const transOnly=baseForBars.filter(r=>isTransCode((r['รหัสอุปกรณ์']||'').trim()));
+  renderCodeBars('transBars', topN(transOnly,'รหัสอุปกรณ์',10), '#a78bfa', 'transSel', trNow2);
+
+  const meterOnly=baseForBars.filter(r=>isMeterCode((r['รหัสอุปกรณ์']||'').trim()));
+  renderCodeBars('meterBars', topN(meterOnly,'รหัสอุปกรณ์',10), '#4dd0e1', 'meterSel', mtNow2);
 
   // Weather bars
   renderBars('weatherBars', topN(f,'สภาพอากาศ',8), 'var(--accent2)');
