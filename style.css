@@ -79,6 +79,29 @@
     letter-spacing: 0.01em;
   }
   .header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .nav-btn {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    background: rgba(56,189,248,0.08);
+    border: 1px solid rgba(56,189,248,0.3);
+    border-radius: 8px;
+    color: var(--accent2);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .15s, border-color .15s, color .15s;
+    flex-shrink: 0;
+  }
+  .nav-btn:hover {
+    background: rgba(56,189,248,0.16);
+    border-color: var(--accent2);
+    color: #fff;
+  }
   .header p b, .header p span#headerDateRange {
     color: #a8b3cc;
     font-weight: 500;
