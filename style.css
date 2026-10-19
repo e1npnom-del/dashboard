@@ -81,17 +81,16 @@
   .header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .filter-bar { position: relative; }
   .nav-btn {
-    margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 8px 16px;
+    gap: 6px;
+    padding: 6px 12px;
     background: rgba(56,189,248,0.08);
     border: 1px solid rgba(56,189,248,0.3);
-    border-radius: 8px;
+    border-radius: 6px;
     color: var(--accent2);
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
