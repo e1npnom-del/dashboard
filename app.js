@@ -190,8 +190,8 @@ function clickBarFilter(selectId, value) {
   if(selectId === 'locationSel') {
     pushFilter('loc', value, () => {
       selectedMonth = null;
-      document.getElementById('dateFrom').value = window._minDate||'';
-      document.getElementById('dateTo').value   = window._maxDate||'';
+      document.getElementById('dateFrom').value = window._defaultFrom||window._minDate||'';
+      document.getElementById('dateTo').value   = window._defaultTo  ||window._maxDate||'';
       setSelectValue('locationSel', value);
       rebuildCodeSelects(value);
       applyFilters();
@@ -210,8 +210,9 @@ function resetFilters() {
   window._resetting = true;
   selectedMonth = null;
   setSelectValue('locationSel', 'all');
-  document.getElementById('dateFrom').value = window._minDate || '';
-  document.getElementById('dateTo').value   = window._maxDate || '';
+  // reset กลับ 1 ม.ค. ของปีล่าสุด → วันล่าสุด
+  document.getElementById('dateFrom').value = window._defaultFrom || window._minDate || '';
+  document.getElementById('dateTo').value   = window._defaultTo   || window._maxDate || '';
   setSelectValue('equipSel', '');
   setSelectValue('transSel', '');
   setSelectValue('meterSel', '');
@@ -738,7 +739,14 @@ function init() {
   const maxDate=dates[dates.length-1]||new Date().toISOString().slice(0,10);
   window._minDate=minDate;
   window._maxDate=maxDate;
-  document.getElementById('dateFrom').value=minDate;
+
+  // default range: 1 ม.ค. ของปีล่าสุดในข้อมูล → วันล่าสุด
+  // ปีถัดไปก็ทำงานอัตโนมัติเพราะใช้ปีจาก maxDate เสมอ
+  const latestYear = maxDate.substring(0, 4);
+  const defaultFrom = `${latestYear}-01-01`;
+  window._defaultFrom = defaultFrom;
+  window._defaultTo   = maxDate;
+  document.getElementById('dateFrom').value=defaultFrom;
   document.getElementById('dateTo').value=maxDate;
 
   // อัพเดท header แสดงช่วงวันที่จริงจาก DATA
