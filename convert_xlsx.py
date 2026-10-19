@@ -74,7 +74,9 @@ def calc_start_time(time_end_str, dur_min):
     except: return ''
 
 def dedup_key(r):
-    return (str(r[20]), str(r[2]), str(r[5]), str(r[6]))
+    # FIX: เพิ่ม เวลาสิ้นสุด (r[3]) เข้า key เพื่อป้องกัน duplicate
+    # กรณี 2 เหตุการณ์ที่สถานที่เดียวกัน เวลาเริ่มเหมือนกัน แต่สิ้นสุดต่างกัน
+    return (str(r[20]), str(r[2]), str(r[5]), str(r[6]), str(r[3]))
 
 # ── 1. โหลด CSV เก่า ─────────────────────────────────────────────
 existing = []
@@ -111,8 +113,25 @@ for ws in wb.worksheets:
     last_person   = ''
     last_vehicle  = ''
 
+    last_seq = None  # FIX: track ลำดับ เพื่อ reset carry-forward เมื่อขึ้นเหตุการณ์ใหม่
+
     for row in ws.iter_rows(min_row=9, values_only=True):
         if len(row) < 10: continue
+
+        # FIX: carry-forward reset — เมื่อ col[0] (ลำดับ) มีค่าใหม่ → เหตุการณ์ใหม่
+        # ป้องกันค่า weather/cause จากวันก่อนหน้าหลุดมายังวันถัดไป
+        cur_seq = cv(row[0])
+        if cur_seq and cur_seq != last_seq and cur_seq not in ('None',''):
+            last_seq    = cur_seq
+            last_weather = ''
+            last_cause   = ''
+            last_channel = ''
+            last_recv    = ''
+            last_depart  = ''
+            last_finish  = ''
+            last_fix     = 0
+            last_person  = ''
+            last_vehicle = ''
 
         # carry-forward วันที่
         if row[2] is not None: last_date_raw = cv(row[2])

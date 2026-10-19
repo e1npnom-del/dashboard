@@ -145,10 +145,21 @@ const csvPaths = [
 
 function tryFetch(paths) {
   if(!paths.length) {
-    document.getElementById('loading').innerHTML =
-      `<div style="color:#ef5350;font-size:15px;font-weight:600">❌ ไม่พบไฟล์ event_outage_data.csv</div>
-       <div style="color:#8b90a8;font-size:12px;margin-top:8px">ตรวจสอบว่าอัพโหลด event_outage_data.csv เข้า GitHub repo แล้ว</div>
-       <div style="color:#8b90a8;font-size:11px;margin-top:4px">URL: ${location.href}</div>`;
+    // FIX: XSS — ใช้ textContent แทน innerHTML สำหรับ dynamic content
+    const loadDiv = document.getElementById('loading');
+    loadDiv.innerHTML = '';
+    const msg1 = document.createElement('div');
+    msg1.style.cssText = 'color:#ef5350;font-size:15px;font-weight:600';
+    msg1.textContent = '❌ ไม่พบไฟล์ event_outage_data.csv';
+    const msg2 = document.createElement('div');
+    msg2.style.cssText = 'color:#8b90a8;font-size:12px;margin-top:8px';
+    msg2.textContent = 'ตรวจสอบว่าอัพโหลด event_outage_data.csv เข้า GitHub repo แล้ว';
+    const msg3 = document.createElement('div');
+    msg3.style.cssText = 'color:#8b90a8;font-size:11px;margin-top:4px';
+    msg3.textContent = 'URL: ' + location.href;
+    loadDiv.appendChild(msg1);
+    loadDiv.appendChild(msg2);
+    loadDiv.appendChild(msg3);
     return;
   }
   const path = paths[0];
@@ -319,24 +330,32 @@ function topN(arr, key, n=10) {
 
 // ── Bar chart renderer ──
 // selectId: id ของ <select> ที่จะตั้งค่าเมื่อคลิก (หรือ null ถ้าคลิกไม่ได้)
+// FIX: safeLabel XSS — ใช้ data-attribute + event delegation แทน inline onclick
 function renderBars(containerId, data, color='var(--accent)', selectId=null) {
   const el = document.getElementById(containerId);
   if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px">ไม่มีข้อมูล</div>'; return; }
   const max = data[0][1];
-  el.innerHTML = data.map(([label, cnt]) => {
-    const safeLabel = label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    const clickAttr = selectId
-      ? `style="cursor:pointer" onclick="clickBarFilter('${selectId}','${safeLabel}')"`
-      : '';
-    return `
-    <div class="bar-row" ${clickAttr}>
-      <div class="bar-label" title="${label}">${label}</div>
-      <div class="bar-track">
-        <div class="bar-fill" style="width:${(cnt/max*100).toFixed(1)}%;background:${color}"></div>
-      </div>
-      <div class="bar-count">${cnt}</div>
-    </div>`;
-  }).join('');
+  // เคลียร์ event listener เก่าก่อน rebuild
+  el.replaceWith(el.cloneNode(false));
+  const newEl = document.getElementById(containerId);
+  data.forEach(([label, cnt]) => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    if(selectId) {
+      row.style.cursor = 'pointer';
+      row.dataset.selectId = selectId;
+      row.dataset.val = label;
+      row.addEventListener('click', () => clickBarFilter(row.dataset.selectId, row.dataset.val));
+    }
+    const pct = (cnt/max*100).toFixed(1);
+    row.innerHTML = `
+      <div class="bar-label" title=""></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bar-count">${cnt}</div>`;
+    row.querySelector('.bar-label').textContent = label; // textContent ป้องกัน XSS
+    row.querySelector('.bar-label').title = label;
+    newEl.appendChild(row);
+  });
 }
 
 // ── Donut chart ──
@@ -427,8 +446,39 @@ function renderMonthBars(containerId, data) {
   }).join('');
 }
 
+// FIX: ResizeObserver — redraw donut เมื่อ canvas เปลี่ยนขนาด
+function setupDonutResize(canvas) {
+  if(canvas._resizeObserver) return;
+  canvas._resizeObserver = new ResizeObserver(() => {
+    // sync canvas logical size กับ display size
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.round(rect.width * dpr);
+    const h = Math.round(rect.height * dpr);
+    if(canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    // redraw ด้วยข้อมูลล่าสุด
+    if(canvas._lastDonutData) {
+      drawDonut(canvas.getContext('2d'), canvas._lastDonutData);
+    }
+  });
+  canvas._resizeObserver.observe(canvas);
+}
+
 // ── Main render ──
 function render() {
+  try { _render(); } catch(e) {
+    console.error('[Dashboard] render error:', e);
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:#ff5757;padding:20px;font-family:Sarabun,sans-serif;font-size:14px';
+    msg.textContent = '⚠️ เกิดข้อผิดพลาดในการแสดงผล — โปรดลองรีเซ็ตฟิลเตอร์';
+    document.querySelector('.main')?.prepend(msg);
+    setTimeout(()=>msg.remove(), 5000);
+  }
+}
+function _render() {
   const f=filtered;
 
   // KPIs
@@ -499,15 +549,33 @@ function render() {
     label:loc.replace(/\s*\([A-Z]+\)$/,''),
     locValue:loc
   }));
+  cvs._lastDonutData = donutData; // เก็บไว้สำหรับ resize redraw
   drawDonut(ctx, donutData);
   setupDonutClick(cvs);
-  document.getElementById('donutLegend').innerHTML=donutData.map(d=>{
+  setupDonutResize(cvs);
+  // FIX: donut legend — ใช้ DOM API ป้องกัน XSS จากชื่อสาขา
+  const legendEl=document.getElementById('donutLegend');
+  legendEl.innerHTML='';
+  donutData.forEach(d=>{
     const isActive=d.locValue===activeLoc;
-    return `<span onclick="clickBarFilter('locationSel','${d.locValue.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 6px;border-radius:4px;transition:all .15s;${isActive?'background:rgba(255,255,255,0.08);outline:1px solid '+d.c+';':''}" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='${isActive?'rgba(255,255,255,0.08)':'transparent'}'">
-      <span style="width:8px;height:8px;border-radius:50%;background:${d.c};flex-shrink:0;${isActive?'box-shadow:0 0 5px '+d.c:''}"></span>
-      <span style="color:${isActive?'#fff':'var(--muted)'};">${d.label}: <b style="color:${isActive?d.c:'var(--text)'}">${d.v}</b></span>
-    </span>`;
-  }).join('');
+    const span=document.createElement('span');
+    span.style.cssText=`display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 6px;border-radius:4px;transition:all .15s;${isActive?'background:rgba(255,255,255,0.08);outline:1px solid '+d.c+';':''}`;
+    span.addEventListener('click',()=>clickBarFilter('locationSel',d.locValue));
+    span.addEventListener('mouseover',()=>{ span.style.background='rgba(255,255,255,0.06)'; });
+    span.addEventListener('mouseout', ()=>{ span.style.background=isActive?'rgba(255,255,255,0.08)':'transparent'; });
+    const dot=document.createElement('span');
+    dot.style.cssText=`width:8px;height:8px;border-radius:50%;background:${d.c};flex-shrink:0;${isActive?'box-shadow:0 0 5px '+d.c:''}`;
+    const txt=document.createElement('span');
+    txt.style.color=isActive?'#fff':'var(--muted)';
+    const bold=document.createElement('b');
+    bold.style.color=isActive?d.c:'var(--text)';
+    bold.textContent=d.v;
+    txt.textContent=d.label+': ';
+    txt.appendChild(bold);
+    span.appendChild(dot);
+    span.appendChild(txt);
+    legendEl.appendChild(span);
+  });
 
   // Monthly bar — คำนวณจาก data ที่กรองด้วย สถานที่+รหัส+dateFrom/To เท่านั้น (ไม่ติด selectedMonth)
   // เพื่อให้เห็นทุกเดือนในช่วงที่เลือก และ count ตรงกับ filtered จริงๆ
@@ -556,24 +624,37 @@ function render() {
     return true;
   });
 
-  // render bar พร้อม highlight ตัวที่เลือก
+  // FIX: renderCodeBars — ใช้ DOM API + event listener แทน innerHTML onclick
   function renderCodeBars(containerId, data, color, selectId, activeVal) {
     const el=document.getElementById(containerId);
     if(!data.length){el.innerHTML='<div style="color:var(--muted);font-size:12px">ไม่มีข้อมูล</div>';return;}
     const max=data[0][1];
-    el.innerHTML=data.map(([label,cnt])=>{
-      const safeLabel=label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    el.replaceWith(el.cloneNode(false));
+    const newEl=document.getElementById(containerId);
+    data.forEach(([label,cnt])=>{
       const isActive=activeVal&&label===activeVal;
       const barColor=isActive?'#fff':color;
-      const bg=isActive?'rgba(255,255,255,0.08)':'';
-      const labelColor=isActive?'#fff':'var(--text)';
-      const ring=isActive?`outline:2px solid ${color};outline-offset:2px;border-radius:4px;`:'';
-      return `<div class="bar-row" style="cursor:pointer;${bg?'background:'+bg+';':''}${ring}" onclick="clickBarFilter('${selectId}','${safeLabel}')">
-        <div class="bar-label" style="color:${labelColor}" title="${label}">${label}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(cnt/max*100).toFixed(1)}%;background:${barColor}"></div></div>
-        <div class="bar-count">${cnt}</div>
-      </div>`;
-    }).join('');
+      const row=document.createElement('div');
+      row.className='bar-row';
+      row.style.cursor='pointer';
+      if(isActive) {
+        row.style.background='rgba(255,255,255,0.08)';
+        row.style.outline=`2px solid ${color}`;
+        row.style.outlineOffset='2px';
+        row.style.borderRadius='4px';
+      }
+      row.dataset.selectId=selectId;
+      row.dataset.val=label;
+      row.addEventListener('click', ()=>clickBarFilter(row.dataset.selectId, row.dataset.val));
+      const pct=(cnt/max*100).toFixed(1);
+      row.innerHTML=`
+        <div class="bar-label" style="color:${isActive?'#fff':'var(--text)'}"></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+        <div class="bar-count">${cnt}</div>`;
+      row.querySelector('.bar-label').textContent=label;
+      row.querySelector('.bar-label').title=label;
+      newEl.appendChild(row);
+    });
   }
 
   const equipOnly=baseForBars.filter(r=>isEquipCode((r['รหัสอุปกรณ์']||'').trim()));
@@ -631,7 +712,7 @@ function render() {
 
   window._renderTable = renderTable;
   renderTable(0);
-}
+} // end _render
 
 window.prevPage = () => { if(window._tablePage>0){window._tablePage--;window._renderTable(window._tablePage);} };
 window.nextPage = () => { const max=Math.ceil(window._tableData.length/200)-1; if(window._tablePage<max){window._tablePage++;window._renderTable(window._tablePage);} };
